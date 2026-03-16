@@ -220,6 +220,34 @@ Query: *"Where is Hebbian learning?"*
 System: Retrieves MemoryGraph methods, strengthens those connections, and improves future retrievals.  
 📌 That’s BDH in action.
 
+
+## 🧪 Interactive Modes (NEW)
+
+The system now supports **two distinct interaction modes**:
+
+### 🔍 1. Explore / Understand Mode
+Allows the user to ask questions about the repository.
+
+**Example Query:**
+> How does the model take raw ECG and produce predictions?
+**Does:**
+- Retrieves relevant functions (`process_input`, `predict_ecg`)
+- Builds context
+- LLM explains full pipeline
+📌 Acts as a **code reasoning agent**
+
+### 💻2. Code Generation Mode
+Add features using natural language.
+
+**Example:**
+Compute HRV from ECG
+
+**Does:**
+- Retrieves relevant code
+- Builds context (imports, structure)
+- Generates new Python file (no overwrite)
+
+📌 Reuses existing repo logic
 ## 🛠️ Tech Stack
 - **Python**  
 - **AST** (static parsing)  
@@ -230,10 +258,35 @@ System: Retrieves MemoryGraph methods, strengthens those connections, and improv
 
 ---
 
-## 🤝 Contribution
-This project is under **active development**.  
+## 🧪 Upcoming Features
 
-**Focus areas:**
-- Retrieval improvement  
-- Better planning logic  
-- Robust execution  
+### ✅ Code Validation Layer (Next Step)
+Currently, generated code is not verified before integration.
+
+Planned addition:
+- Execute generated code in a controlled environment
+- Validate:
+  - Syntax correctness
+  - Import resolution
+  - Function execution (basic tests)
+
+---
+
+### 🔁 Hebbian Feedback Integration
+Hebbian updates will be improved using validation results:
+
+- ✔️ If generated code works → strengthen connections
+- ❌ If code fails → weaken connections
+
+📌 This creates a **learning loop based on success/failure**, not just usage.
+
+---
+
+### 🧠 Future Vision
+- Automatic intent detection (no manual mode selection)
+- Graph-based diagram generation of repo
+- Multi-file modifications
+- Autonomous refactoring suggestions
+
+## 🤝 Contribution
+This project is under **active development**.  Any contributions are welcome.
