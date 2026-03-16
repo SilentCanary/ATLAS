@@ -13,11 +13,10 @@ from context.clustering import cluster_by_files, cluster_scc
 from context.local_context import build_context_for_nodes
 from context.summarizer import summarize_clusters
 from context.global_summary import generate_global_summary
-from utils.planner import plan_code
+from utils.planner import plan_code,explain_repo
 MEMORY_FILE = "data/memory_graph.json"
 
-if __name__ == "__main__":
-    repo_url = input("Enter the Github Repository URL: ")
+def initialize_repo(repo_url):
     print("Cloning repository...")
     cloner = RepoCloner()
     repo_path = cloner.clone_repo(repo_url)
@@ -66,83 +65,72 @@ if __name__ == "__main__":
             relation_type=data.get("relation", "related_to")
         )
 
-    # Retriever
     graph_store = GraphStore(repo_graph)
     retriever = CodeRetriever(collection=collection, graph_store=graph_store, top_k=5)
 
-    # ----------------------
-    # Query & Retrieval
-    # ----------------------
-    query = input("Enter your query: ")
+    structure_dict = build_repo_structure(repo_path)
+    repo_structure = format_structure(structure_dict)
+
+    return parsed, repo_graph, memory, retriever, graph_store, repo_structure
+
+def explore_repo(parsed, graph_store, retriever, repo_structure):
+    query = input("What do you want to know about the repo? ")
     results = retriever.retrieve(query)
 
-    print("\nTop retrieved nodes (combined semantic + Hebbian):")
+    print("\nTop retrieved nodes:")
     for node, score in results[:10]:
         node_type = graph_store.graph.nodes[node].get("type")
         folder = graph_store.graph.nodes[node].get("folder")
         module = graph_store.graph.nodes[node].get("module")
         print(f"{node_type}: {node} (folder: {folder}, module: {module}, score: {score:.3f})")
 
-    # ----------------------
-    # Suggested folder and imports
-    # ----------------------
+    # Generate clusters & summaries
     top_nodes = [node for node, _ in results[:5]]
-    folders = [graph_store.graph.nodes[n].get("folder") for n in top_nodes if graph_store.graph.nodes[n].get("folder")]
-    target_folder = max(set(folders), key=folders.count) if folders else "new_folder"
-    print("Suggested folder for new code:", target_folder)
-
-    import_nodes = set()
-    for node in top_nodes:
-        import_nodes.update(graph_store.get_full_upstream(node, types=["file", "module"]))
-    print("Suggested imports for new code:", import_nodes)
-
-    # Save MemoryGraph
-    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        f.write(memory.to_json())
-    print(f"MemoryGraph saved to {MEMORY_FILE}")
-
-    structure_dict = build_repo_structure(repo_path)
-    repo_structure = format_structure(structure_dict)
-    print("\n📁 Repo Structure (preview):\n", repo_structure[:500], "...")
-
-    
-    snippets = {}
-    for node in top_nodes:
-        if node in parsed.get("functions", {}):
-            snippets[node] = parsed["functions"][node].get("code", "")
-        elif node in parsed.get("files", {}):
-            snippets[node] = parsed["files"][node].get("content", "")
-
-    
+    snippets = {n: parsed.get("functions", {}).get(n, {}).get("code", "") for n in top_nodes}
     contexts = build_context_for_nodes(graph_store, top_nodes)
-
     clusters = cluster_by_files(top_nodes)
-    print("\n🧩 Clusters:", clusters)
-
-
-  
     cluster_summaries = summarize_clusters(clusters, contexts, snippets)
+    global_summary = generate_global_summary(cluster_summaries, repo_structure)
+
     print("\n🧠 Cluster Summaries:")
     for c in cluster_summaries:
         print(c['cluster'], "->", c['summary'])
-
-   
-    global_summary = generate_global_summary(cluster_summaries, repo_structure)
     print("\n🌍 Global Summary:\n", global_summary)
+    answer = explain_repo(context, query)
+    print("\n🧠 Answer:\n", answer)
+    
 
-  
+def generate_code(context):
+    query = input("Enter the new feature or code you want to add: ")
+    new_code = plan_code(context, query)
+    print("\nGenerated Code:\n", new_code)
+
+if __name__ == "__main__":
+    repo_url = input("Enter the Github Repository URL: ")
+    parsed, repo_graph, memory, retriever, graph_store, repo_structure = initialize_repo(repo_url)
+
     context = {
-        "repo_summary": global_summary,
-        "module_summaries": cluster_summaries,
+        "repo_summary": generate_global_summary([], format_structure(build_repo_structure(repo_url))),
+        "module_summaries": [],
         "repo_structure": repo_structure,
-        "retrieved_code": snippets,
-        "target_folder": target_folder,
-        "imports": list(import_nodes)
+        "retrieved_code": {},
+        "target_folder": "new_folder",
+        "imports": []
     }
 
-    print("\n🔥 FINAL CONTEXT:\n", context)
-   
-    new_code = plan_code(context, query)
-    print(new_code)
-    # new_file_path = execute_plan(new_code, context['target_folder'], file_name="new_feature.py")
-    # print(f"New code created at: {new_file_path}")
+    while True:
+        print("\n--- MENU ---")
+        print("1. Explore / Understand Repository")
+        print("2. Generate Code")
+        print("3. Exit")
+        choice = input("Choose an option (1-3): ")
+
+        if choice == "1":
+            explore_repo(parsed, graph_store, retriever, repo_structure)
+        elif choice == "2":
+            generate_code(context)
+        elif choice == "3":
+            print("Exiting...")
+            break
+        else:
+            print("Invalid choice. Try again.")
