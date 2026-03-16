@@ -1,0 +1,1609 @@
+{
+  "repos\\ATLAS\\main.py": {
+    "file_path": "repos\\ATLAS\\main.py",
+    "functions": {},
+    "classes": {},
+    "imports": [
+      "os",
+      "json",
+      "pickle",
+      "parser.repo_cloner",
+      "parser.repo_parser",
+      "graph.graph_builder",
+      "semantic.embeddings",
+      "semantic.retrieval",
+      "graph.graph_store",
+      "graph.memory_graph",
+      "context.repo_structure",
+      "context.clustering",
+      "context.local_context",
+      "context.summarizer",
+      "context.global_summary",
+      "utils.planner"
+    ],
+    "folder": ".",
+    "module": "main"
+  },
+  "repos\\ATLAS\\main2.py": {
+    "file_path": "repos\\ATLAS\\main2.py",
+    "functions": {
+      "initialize_repo": {
+        "args": [
+          "repo_url"
+        ],
+        "calls": [
+          "print",
+          "RepoCloner",
+          "cloner.clone_repo",
+          "print",
+          "CodeParser",
+          "parser.parse_repository",
+          "os.makedirs",
+          "os.path.join",
+          "open",
+          "json.dump",
+          "print",
+          "print",
+          "CodeGraphBuilder",
+          "builder.build_graph",
+          "print",
+          "repo_graph.number_of_nodes",
+          "print",
+          "repo_graph.number_of_edges",
+          "open",
+          "pickle.dump",
+          "print",
+          "print",
+          "build_semantic_memmory",
+          "print",
+          "len",
+          "collection.get",
+          "print",
+          "os.path.exists",
+          "open",
+          "MemoryGraph.from_json",
+          "f.read",
+          "print",
+          "MemoryGraph",
+          "print",
+          "repo_graph.nodes",
+          "memory.add_node",
+          "get",
+          "repo_graph.edges",
+          "memory.add_edge",
+          "data.get",
+          "data.get",
+          "GraphStore",
+          "CodeRetriever",
+          "build_repo_structure",
+          "format_structure"
+        ],
+        "start_line": 19,
+        "end_line": 74,
+        "code": "def initialize_repo(repo_url):\n    print(\"Cloning repository...\")\n    cloner = RepoCloner()\n    repo_path = cloner.clone_repo(repo_url)\n\n    print(\"Parsing repository...\")\n    parser = CodeParser()\n    parsed = parser.parse_repository(repo_path)\n\n    os.makedirs(\"data\", exist_ok=True)\n    parsed_file = os.path.join(\"data\", \"parsed_repo.json\")\n    with open(parsed_file, \"w\", encoding=\"utf-8\") as f:\n        json.dump(parsed, f, indent=2)\n    print(f\"Parsed repo saved to {parsed_file}\")\n\n    print(\"Building repository graph...\")\n    builder = CodeGraphBuilder()\n    repo_graph = builder.build_graph(parsed)\n    print(\"Nodes:\", repo_graph.number_of_nodes())\n    print(\"Edges:\", repo_graph.number_of_edges())\n\n    graph_file = \"data/repo_graph.pkl\"\n    with open(graph_file, \"wb\") as f:\n        pickle.dump(repo_graph, f)\n    print(f\"Graph saved to {graph_file}\")\n\n    print(\"Building semantic memory...\")\n    collection = build_semantic_memmory(parsed)\n    print(f\"Collection info: {len(collection.get()['ids'])}\")\n\n    print(\"Loading or initializing Hebbian MemoryGraph...\")\n    if os.path.exists(MEMORY_FILE):\n        with open(MEMORY_FILE, \"r\", encoding=\"utf-8\") as f:\n            memory = MemoryGraph.from_json(f.read())\n        print(\"MemoryGraph loaded from previous session.\")\n    else:\n        memory = MemoryGraph()\n        print(\"Initialized new MemoryGraph.\")\n\n    # Add nodes and edges\n    for node in repo_graph.nodes():\n        memory.add_node(node, node_type=repo_graph.nodes[node].get(\"type\", \"concept\"))\n    for src, tgt, data in repo_graph.edges(data=True):\n        memory.add_edge(\n            src, tgt,\n            weight=data.get(\"weight\", 0.1),\n            relation_type=data.get(\"relation\", \"related_to\")\n        )\n\n    graph_store = GraphStore(repo_graph)\n    retriever = CodeRetriever(collection=collection, graph_store=graph_store, top_k=5)\n\n    structure_dict = build_repo_structure(repo_path)\n    repo_structure = format_structure(structure_dict)\n\n    return parsed, repo_graph, memory, retriever, graph_store, repo_structure"
+      },
+      "explore_repo": {
+        "args": [
+          "parsed",
+          "graph_store",
+          "retriever",
+          "repo_structure"
+        ],
+        "calls": [
+          "input",
+          "retriever.retrieve",
+          "print",
+          "get",
+          "get",
+          "get",
+          "print",
+          "get",
+          "get",
+          "parsed.get",
+          "build_context_for_nodes",
+          "cluster_by_files",
+          "summarize_clusters",
+          "generate_global_summary",
+          "print",
+          "print",
+          "print",
+          "explain_repo",
+          "print"
+        ],
+        "start_line": 76,
+        "end_line": 100,
+        "code": "def explore_repo(parsed, graph_store, retriever, repo_structure):\n    query = input(\"What do you want to know about the repo? \")\n    results = retriever.retrieve(query)\n\n    print(\"\\nTop retrieved nodes:\")\n    for node, score in results[:10]:\n        node_type = graph_store.graph.nodes[node].get(\"type\")\n        folder = graph_store.graph.nodes[node].get(\"folder\")\n        module = graph_store.graph.nodes[node].get(\"module\")\n        print(f\"{node_type}: {node} (folder: {folder}, module: {module}, score: {score:.3f})\")\n\n    # Generate clusters & summaries\n    top_nodes = [node for node, _ in results[:5]]\n    snippets = {n: parsed.get(\"functions\", {}).get(n, {}).get(\"code\", \"\") for n in top_nodes}\n    contexts = build_context_for_nodes(graph_store, top_nodes)\n    clusters = cluster_by_files(top_nodes)\n    cluster_summaries = summarize_clusters(clusters, contexts, snippets)\n    global_summary = generate_global_summary(cluster_summaries, repo_structure)\n\n    print(\"\\n\ud83e\udde0 Cluster Summaries:\")\n    for c in cluster_summaries:\n        print(c['cluster'], \"->\", c['summary'])\n    print(\"\\n\ud83c\udf0d Global Summary:\\n\", global_summary)\n    answer = explain_repo(context, query)\n    print(\"\\n\ud83e\udde0 Answer:\\n\", answer)"
+      },
+      "generate_code": {
+        "args": [
+          "context"
+        ],
+        "calls": [
+          "input",
+          "plan_code",
+          "print"
+        ],
+        "start_line": 103,
+        "end_line": 106,
+        "code": "def generate_code(context):\n    query = input(\"Enter the new feature or code you want to add: \")\n    new_code = plan_code(context, query)\n    print(\"\\nGenerated Code:\\n\", new_code)"
+      }
+    },
+    "classes": {},
+    "imports": [
+      "os",
+      "json",
+      "pickle",
+      "parser.repo_cloner",
+      "parser.repo_parser",
+      "graph.graph_builder",
+      "semantic.embeddings",
+      "semantic.retrieval",
+      "graph.graph_store",
+      "graph.memory_graph",
+      "context.repo_structure",
+      "context.clustering",
+      "context.local_context",
+      "context.summarizer",
+      "context.global_summary",
+      "utils.planner"
+    ],
+    "folder": ".",
+    "module": "main2"
+  },
+  "repos\\ATLAS\\context\\clustering.py": {
+    "file_path": "repos\\ATLAS\\context\\clustering.py",
+    "functions": {
+      "cluster_by_files": {
+        "args": [
+          "nodes"
+        ],
+        "calls": [
+          "defaultdict",
+          "node.split",
+          "append",
+          "list",
+          "clusters.values"
+        ],
+        "start_line": 3,
+        "end_line": 9,
+        "code": "def cluster_by_files(nodes):\n    clusters=defaultdict(list)\n    for node in nodes:\n        file_path=node.split(\"::\")[0]\n        clusters[file_path].append(node)\n    \n    return list(clusters.values())"
+      },
+      "cluster_scc": {
+        "args": [
+          "graph",
+          "nodes"
+        ],
+        "calls": [
+          "set",
+          "visited.add",
+          "current_cluster.append",
+          "graph.get_neighbors",
+          "dfs",
+          "dfs",
+          "clusters.append"
+        ],
+        "start_line": 11,
+        "end_line": 29,
+        "code": "def cluster_scc(graph, nodes):\n    visited = set()\n    clusters = []\n\n    def dfs(node, current_cluster):\n        visited.add(node)\n        current_cluster.append(node)\n\n        for nei in graph.get_neighbors(node):\n            if nei not in visited:\n                dfs(nei, current_cluster)\n\n    for node in nodes:\n        if node not in visited:\n            cluster = []\n            dfs(node, cluster)\n            clusters.append(cluster)\n\n    return clusters"
+      }
+    },
+    "classes": {},
+    "imports": [
+      "collections"
+    ],
+    "folder": "context",
+    "module": "clustering"
+  },
+  "repos\\ATLAS\\context\\final_context.py": {
+    "file_path": "repos\\ATLAS\\context\\final_context.py",
+    "functions": {
+      "build_final_context": {
+        "args": [
+          "global_summary",
+          "cluster_summaries",
+          "structure",
+          "snippets"
+        ],
+        "calls": [],
+        "start_line": 1,
+        "end_line": 7,
+        "code": "def build_final_context(global_summary, cluster_summaries, structure, snippets):\n    return {\n        \"repo_summary\": global_summary,\n        \"module_summaries\": cluster_summaries,\n        \"repo_structure\": structure,\n        \"retrieved_code\": snippets\n    }"
+      }
+    },
+    "classes": {},
+    "imports": [],
+    "folder": "context",
+    "module": "final_context"
+  },
+  "repos\\ATLAS\\context\\global_summary.py": {
+    "file_path": "repos\\ATLAS\\context\\global_summary.py",
+    "functions": {
+      "build_global_prompt": {
+        "args": [
+          "cluster_summaries",
+          "repo_structure"
+        ],
+        "calls": [
+          "str"
+        ],
+        "start_line": 2,
+        "end_line": 14,
+        "code": "def build_global_prompt(cluster_summaries, repo_structure):\n    prompt = \"You are given a codebase summary.\\n\\n\"\n\n    prompt += \"Repository Structure:\\n\"\n    prompt += str(repo_structure) + \"\\n\\n\"\n\n    prompt += \"Module Summaries:\\n\"\n    for c in cluster_summaries:\n        prompt += f\"- {c['summary']}\\n\"\n\n    prompt += \"\\nExplain what this project does and how it is organized.\"\n\n    return prompt"
+      },
+      "generate_global_summary": {
+        "args": [
+          "cluster_summaries",
+          "structure"
+        ],
+        "calls": [
+          "build_global_prompt",
+          "ask_llm"
+        ],
+        "start_line": 16,
+        "end_line": 18,
+        "code": "def generate_global_summary(cluster_summaries, structure):\n    prompt = build_global_prompt(cluster_summaries, structure)\n    return ask_llm(prompt)"
+      }
+    },
+    "classes": {},
+    "imports": [
+      "llm_call"
+    ],
+    "folder": "context",
+    "module": "global_summary"
+  },
+  "repos\\ATLAS\\context\\llm_call.py": {
+    "file_path": "repos\\ATLAS\\context\\llm_call.py",
+    "functions": {
+      "ask_llm": {
+        "args": [
+          "prompt",
+          "max_tokens",
+          "temperature"
+        ],
+        "calls": [
+          "bedrock_client.invoke_model",
+          "BytesIO",
+          "encode",
+          "json.dumps",
+          "read",
+          "raw_body.decode",
+          "print",
+          "json.loads",
+          "get",
+          "str"
+        ],
+        "start_line": 22,
+        "end_line": 56,
+        "code": "def ask_llm(prompt: str, max_tokens: int = 512, temperature: float = 0.5) -> str:\n    import json, boto3\n    from io import BytesIO\n\n    payload = {\n        \"anthropic_version\": \"bedrock-2023-05-31\",\n        \"max_tokens\": max_tokens,\n        \"temperature\": temperature,\n        \"messages\": [{\"role\": \"user\", \"content\": prompt}]\n    }\n\n    response = bedrock_client.invoke_model(\n        modelId=LLM_MODEL,\n        body=BytesIO(json.dumps(payload).encode(\"utf-8\")),\n        contentType=\"application/json\",\n        accept=\"application/json\"\n    )\n\n    raw_body = response[\"body\"].read()\n    raw_text = raw_body.decode()\n    print(\"\\n--- RAW RESPONSE ---\\n\", raw_text, \"\\n--- END RAW RESPONSE ---\\n\")\n\n    try:\n        result = json.loads(raw_text)\n        # Check multiple structures\n        if \"choices\" in result:\n            return result[\"choices\"][0][\"message\"][\"content\"]\n        elif \"content\" in result:\n            return result[\"content\"][0].get(\"text\", \"\")\n        elif \"completion\" in result:\n            return result[\"completion\"]\n        else:\n            return str(result)\n    except json.JSONDecodeError:\n        return raw_text"
+      }
+    },
+    "classes": {},
+    "imports": [
+      "json",
+      "boto3",
+      "io",
+      "typing"
+    ],
+    "folder": "context",
+    "module": "llm_call"
+  },
+  "repos\\ATLAS\\context\\local_context.py": {
+    "file_path": "repos\\ATLAS\\context\\local_context.py",
+    "functions": {
+      "get_local_context": {
+        "args": [
+          "graph",
+          "node",
+          "types"
+        ],
+        "calls": [
+          "graph.get_full_upstream",
+          "graph.get_full_downstream"
+        ],
+        "start_line": 1,
+        "end_line": 6,
+        "code": "def get_local_context(graph,node,types=None):\n    return{\n        \"node\":node,\n        \"upstream\":graph.get_full_upstream(node,types=types),\n        \"downstream\":graph.get_full_downstream(node,types=types)\n    }"
+      },
+      "build_context_for_nodes": {
+        "args": [
+          "graph",
+          "nodes",
+          "types"
+        ],
+        "calls": [
+          "get_local_context",
+          "contexts.append"
+        ],
+        "start_line": 8,
+        "end_line": 14,
+        "code": "def build_context_for_nodes(graph,nodes,types=None):\n    contexts=[]\n    for node in nodes:\n        ctx=get_local_context(graph,node,types=types)\n        contexts.append(ctx)\n\n    return contexts"
+      }
+    },
+    "classes": {},
+    "imports": [],
+    "folder": "context",
+    "module": "local_context"
+  },
+  "repos\\ATLAS\\context\\repo_structure.py": {
+    "file_path": "repos\\ATLAS\\context\\repo_structure.py",
+    "functions": {
+      "build_repo_structure": {
+        "args": [
+          "repo_path"
+        ],
+        "calls": [
+          "os.walk",
+          "os.path.relpath"
+        ],
+        "start_line": 3,
+        "end_line": 14,
+        "code": "def build_repo_structure(repo_path):\n    structure = {}\n\n    for root, dirs, files in os.walk(repo_path):\n        rel_path = os.path.relpath(root, repo_path)\n\n        structure[rel_path] = {\n            \"folders\": dirs,\n            \"files\": files\n        }\n\n    return structure"
+      },
+      "format_structure": {
+        "args": [
+          "structure"
+        ],
+        "calls": [
+          "structure.items"
+        ],
+        "start_line": 16,
+        "end_line": 25,
+        "code": "def format_structure(structure):\n    text = \"\"\n\n    for path, content in structure.items():\n        text += f\"\\n\ud83d\udcc1 {path}\\n\"\n\n        for f in content[\"files\"]:\n            text += f\"  - {f}\\n\"\n\n    return text"
+      }
+    },
+    "classes": {},
+    "imports": [
+      "os"
+    ],
+    "folder": "context",
+    "module": "repo_structure"
+  },
+  "repos\\ATLAS\\context\\summarizer.py": {
+    "file_path": "repos\\ATLAS\\context\\summarizer.py",
+    "functions": {
+      "build_cluster_prompt": {
+        "args": [
+          "cluster",
+          "contexts",
+          "snippets"
+        ],
+        "calls": [],
+        "start_line": 2,
+        "end_line": 23,
+        "code": "def build_cluster_prompt(cluster, contexts, snippets):\n    text = \"You are analyzing a codebase.\\n\\n\"\n\n    text += \"Functions in this group:\\n\"\n    for node in cluster:\n        text += f\"- {node}\\n\"\n\n    text += \"\\nContext:\\n\"\n    for ctx in contexts:\n        if ctx[\"node\"] in cluster:\n            text += f\"\\nNode: {ctx['node']}\\n\"\n            text += f\"Upstream: {ctx['upstream']}\\n\"\n            text += f\"Downstream: {ctx['downstream']}\\n\"\n\n    text += \"\\nCode Snippets:\\n\"\n    for node in cluster:\n        if node in snippets:\n            text += f\"\\n{snippets[node]}\\n\"\n\n    text += \"\\nSummarize what this group of functions does in 1-2 lines.\"\n\n    return text"
+      },
+      "summarize_clusters": {
+        "args": [
+          "clusters",
+          "contexts",
+          "snippets"
+        ],
+        "calls": [
+          "build_cluster_prompt",
+          "ask_llm",
+          "summaries.append"
+        ],
+        "start_line": 25,
+        "end_line": 37,
+        "code": "def summarize_clusters(clusters, contexts, snippets):\n    summaries = []\n\n    for cluster in clusters:\n        prompt = build_cluster_prompt(cluster, contexts, snippets)\n        summary = ask_llm(prompt)\n\n        summaries.append({\n            \"cluster\": cluster,\n            \"summary\": summary\n        })\n\n    return summaries"
+      }
+    },
+    "classes": {},
+    "imports": [
+      "llm_call"
+    ],
+    "folder": "context",
+    "module": "summarizer"
+  },
+  "repos\\ATLAS\\context\\__init__.py": {
+    "file_path": "repos\\ATLAS\\context\\__init__.py",
+    "functions": {},
+    "classes": {},
+    "imports": [],
+    "folder": "context",
+    "module": "__init__"
+  },
+  "repos\\ATLAS\\graph\\graph_builder.py": {
+    "file_path": "repos\\ATLAS\\graph\\graph_builder.py",
+    "functions": {},
+    "classes": {
+      "CodeGraphBuilder": {
+        "inherits": [],
+        "methods": {
+          "__init__": {
+            "args": [
+              "self"
+            ],
+            "calls": [
+              "nx.DiGraph"
+            ],
+            "start_line": 5,
+            "end_line": 6,
+            "code": "def __init__(self):\n        self.graph=nx.DiGraph()"
+          },
+          "build_graph": {
+            "args": [
+              "self",
+              "parsed_repo"
+            ],
+            "calls": [
+              "parsed_repo.items",
+              "data.get",
+              "items",
+              "data.get",
+              "cls_data.get",
+              "parsed_repo.items",
+              "self.graph.add_node",
+              "data.get",
+              "self.graph.add_node",
+              "self.graph.add_edge",
+              "items",
+              "data.get",
+              "self.graph.add_node",
+              "self.graph.add_edge",
+              "items",
+              "data.get",
+              "self.graph.add_node",
+              "self.graph.add_edge",
+              "cls_data.get",
+              "self.graph.add_node",
+              "self.graph.add_edge",
+              "items",
+              "cls_data.get",
+              "self.graph.add_node",
+              "self.graph.add_edge",
+              "parsed_repo.items",
+              "items",
+              "data.get",
+              "func_data.get",
+              "function_lookup.get",
+              "self.graph.add_edge",
+              "self.graph.add_node",
+              "self.graph.add_edge",
+              "items",
+              "data.get",
+              "items",
+              "cls_data.get",
+              "method_data.get",
+              "method_lookup.get",
+              "function_lookup.get",
+              "self.graph.add_edge",
+              "self.graph.add_node",
+              "self.graph.add_edge"
+            ],
+            "start_line": 8,
+            "end_line": 108,
+            "code": "def build_graph(self,parsed_repo):\n\n        function_lookup={}\n        method_lookup={}\n\n        for file_path, data in parsed_repo.items():\n\n            for func_name in data.get(\"functions\",{}):\n                node=f\"{file_path}::{func_name}\"\n                function_lookup[func_name]=node \n\n            for cls_name,cls_data in data.get(\"classes\",{}).items():\n                for method_name in cls_data.get(\"methods\",{}):\n                    key=f\"{cls_name}.{method_name}\"\n                    node=f\"{file_path}::{cls_name}::{method_name}\"\n                    method_lookup[key]=node\n            \n        for file_path, data in parsed_repo.items():\n            self.graph.add_node(file_path,type=\"file\")\n\n\n            for imp in data.get(\"imports\",[]):\n                self.graph.add_node(imp,type=\"module\")\n                self.graph.add_edge(file_path,imp,relation=\"imports\")\n\n\n            for func_name, func_data in data.get(\"functions\",{}).items():\n                func_node=f\"{file_path}::{func_name}\"\n                self.graph.add_node(\n                    func_node,\n                    type=\"function\",\n                    code=func_data[\"code\"],\n                    args=func_data[\"args\"],\n                    start_line=func_data[\"start_line\"],\n                    end_line=func_data[\"end_line\"]\n                )\n                self.graph.add_edge(file_path,func_node,relation=\"defines\")\n\n\n            for cls_name, cls_data in data.get(\"classes\", {}).items():\n\n                cls_node = f\"{file_path}::{cls_name}\"\n\n                self.graph.add_node(cls_node, type=\"class\")\n                self.graph.add_edge(file_path, cls_node, relation=\"defines\")\n\n                # Inheritance\n                for parent in cls_data.get(\"inherits\", []):\n                    self.graph.add_node(parent, type=\"class\")\n                    self.graph.add_edge(cls_node, parent, relation=\"inherits\")\n\n                # Methods\n                for method_name, method_data in cls_data.get(\"methods\", {}).items():\n\n                    method_node = f\"{file_path}::{cls_name}::{method_name}\"\n\n                    self.graph.add_node(\n                        method_node,\n                        type=\"method\",\n                        code=method_data[\"code\"],\n                        args=method_data[\"args\"],\n                        start_line=method_data[\"start_line\"],\n                        end_line=method_data[\"end_line\"]\n                    )\n\n                    self.graph.add_edge(cls_node, method_node, relation=\"defines\")\n\n\n        for file_path,data in parsed_repo.items():\n\n            for func_name,func_data in data.get(\"functions\",{}).items():\n                func_node = f\"{file_path}::{func_name}\"\n\n                for call in func_data.get(\"calls\", []):\n\n                    target = function_lookup.get(call)\n\n                    if target:\n                        self.graph.add_edge(func_node, target, relation=\"calls\")\n                    else:\n                        self.graph.add_node(call, type=\"external_function\")\n                        self.graph.add_edge(func_node, call, relation=\"calls\")\n\n            for cls_name, cls_data in data.get(\"classes\", {}).items():\n\n                for method_name, method_data in cls_data.get(\"methods\", {}).items():\n\n                    method_node = f\"{file_path}::{cls_name}::{method_name}\"\n\n                    for call in method_data.get(\"calls\", []):\n\n                        key = f\"{cls_name}.{call}\"\n                        target = method_lookup.get(key) or function_lookup.get(call)\n\n                        if target:\n                            self.graph.add_edge(method_node, target, relation=\"calls\")\n                        else:\n                            self.graph.add_node(call, type=\"external_function\")\n                            self.graph.add_edge(method_node, call, relation=\"calls\")\n\n        return self.graph"
+          }
+        }
+      }
+    },
+    "imports": [
+      "networkx"
+    ],
+    "folder": "graph",
+    "module": "graph_builder"
+  },
+  "repos\\ATLAS\\graph\\graph_store.py": {
+    "file_path": "repos\\ATLAS\\graph\\graph_store.py",
+    "functions": {},
+    "classes": {
+      "GraphStore": {
+        "inherits": [],
+        "methods": {
+          "__init__": {
+            "args": [
+              "self",
+              "graph"
+            ],
+            "calls": [],
+            "start_line": 2,
+            "end_line": 3,
+            "code": "def __init__(self, graph):\n        self.graph = graph"
+          },
+          "get_downstream_impact": {
+            "args": [
+              "self",
+              "node",
+              "types"
+            ],
+            "calls": [
+              "list",
+              "self.graph.successors",
+              "get"
+            ],
+            "start_line": 6,
+            "end_line": 14,
+            "code": "def get_downstream_impact(self, node, types=None):\n     \n        if node not in self.graph:\n            return []\n\n        neighbors = list(self.graph.successors(node))\n        if types:\n            neighbors = [n for n in neighbors if self.graph.nodes[n].get(\"type\") in types]\n        return neighbors"
+          },
+          "get_upstream_dependencies": {
+            "args": [
+              "self",
+              "node",
+              "types"
+            ],
+            "calls": [
+              "list",
+              "self.graph.predecessors",
+              "get"
+            ],
+            "start_line": 17,
+            "end_line": 24,
+            "code": "def get_upstream_dependencies(self, node, types=None):\n        if node not in self.graph:\n            return []\n\n        neighbors = list(self.graph.predecessors(node))\n        if types:\n            neighbors = [n for n in neighbors if self.graph.nodes[n].get(\"type\") in types]\n        return neighbors"
+          },
+          "get_full_downstream": {
+            "args": [
+              "self",
+              "node",
+              "types"
+            ],
+            "calls": [
+              "set",
+              "queue.pop",
+              "self.graph.successors",
+              "visited.add",
+              "queue.append",
+              "get",
+              "list"
+            ],
+            "start_line": 27,
+            "end_line": 43,
+            "code": "def get_full_downstream(self, node, types=None):\n        if node not in self.graph:\n            return []\n\n        visited = set()\n        queue = [node]\n\n        while queue:\n            current = queue.pop(0)\n            for neighbor in self.graph.successors(current):\n                if neighbor not in visited:\n                    visited.add(neighbor)\n                    queue.append(neighbor)\n\n        if types:\n            return [n for n in visited if self.graph.nodes[n].get(\"type\") in types]\n        return list(visited)"
+          },
+          "get_full_upstream": {
+            "args": [
+              "self",
+              "node",
+              "types"
+            ],
+            "calls": [
+              "set",
+              "queue.pop",
+              "self.graph.predecessors",
+              "visited.add",
+              "queue.append",
+              "get",
+              "list"
+            ],
+            "start_line": 46,
+            "end_line": 62,
+            "code": "def get_full_upstream(self, node, types=None):\n        if node not in self.graph:\n            return []\n\n        visited = set()\n        queue = [node]\n\n        while queue:\n            current = queue.pop(0)\n            for neighbor in self.graph.predecessors(current):\n                if neighbor not in visited:\n                    visited.add(neighbor)\n                    queue.append(neighbor)\n\n        if types:\n            return [n for n in visited if self.graph.nodes[n].get(\"type\") in types]\n        return list(visited)"
+          },
+          "get_function_downstream": {
+            "args": [
+              "self",
+              "node"
+            ],
+            "calls": [
+              "self.get_full_downstream"
+            ],
+            "start_line": 65,
+            "end_line": 66,
+            "code": "def get_function_downstream(self, node):\n        return self.get_full_downstream(node, types=[\"function\"])"
+          },
+          "get_method_downstream": {
+            "args": [
+              "self",
+              "node"
+            ],
+            "calls": [
+              "self.get_full_downstream"
+            ],
+            "start_line": 69,
+            "end_line": 70,
+            "code": "def get_method_downstream(self, node):\n        return self.get_full_downstream(node, types=[\"method\"])"
+          },
+          "get_folder_downstream": {
+            "args": [
+              "self",
+              "node"
+            ],
+            "calls": [
+              "self.get_full_downstream"
+            ],
+            "start_line": 73,
+            "end_line": 74,
+            "code": "def get_folder_downstream(self, node):\n        return self.get_full_downstream(node, types=[\"folder\"])"
+          },
+          "get_module_downstream": {
+            "args": [
+              "self",
+              "node"
+            ],
+            "calls": [
+              "self.get_full_downstream"
+            ],
+            "start_line": 77,
+            "end_line": 78,
+            "code": "def get_module_downstream(self, node):\n        return self.get_full_downstream(node, types=[\"module\"])"
+          }
+        }
+      }
+    },
+    "imports": [],
+    "folder": "graph",
+    "module": "graph_store"
+  },
+  "repos\\ATLAS\\graph\\memory_graph.py": {
+    "file_path": "repos\\ATLAS\\graph\\memory_graph.py",
+    "functions": {},
+    "classes": {
+      "NodeData": {
+        "inherits": [],
+        "methods": {
+          "to_dict": {
+            "args": [
+              "self"
+            ],
+            "calls": [],
+            "start_line": 19,
+            "end_line": 27,
+            "code": "def to_dict(self) -> dict:\n        return {\n            \"activation\": self.activation,\n            \"confidence\": self.confidence,\n            \"created_at\": self.created_at,\n            \"updated_at\": self.updated_at,\n            \"node_type\": self.node_type,\n            \"metadata\": self.metadata\n        }"
+          },
+          "from_dict": {
+            "args": [
+              "cls",
+              "data"
+            ],
+            "calls": [
+              "cls",
+              "data.get",
+              "data.get",
+              "data.get",
+              "isoformat",
+              "datetime.now",
+              "data.get",
+              "isoformat",
+              "datetime.now",
+              "data.get",
+              "data.get"
+            ],
+            "start_line": 30,
+            "end_line": 38,
+            "code": "def from_dict(cls, data: dict) -> \"NodeData\":\n        return cls(\n            activation=data.get(\"activation\", 1.0),\n            confidence=data.get(\"confidence\", 1.0),\n            created_at=data.get(\"created_at\", datetime.now().isoformat()),\n            updated_at=data.get(\"updated_at\", datetime.now().isoformat()),\n            node_type=data.get(\"node_type\", \"concept\"),\n            metadata=data.get(\"metadata\", {})\n        )"
+          }
+        }
+      },
+      "EdgeData": {
+        "inherits": [],
+        "methods": {
+          "to_dict": {
+            "args": [
+              "self"
+            ],
+            "calls": [],
+            "start_line": 50,
+            "end_line": 57,
+            "code": "def to_dict(self) -> dict:\n        return {\n            \"weight\": self.weight,\n            \"relation_type\": self.relation_type,\n            \"created_at\": self.created_at,\n            \"updated_at\": self.updated_at,\n            \"co_activation_count\": self.co_activation_count\n        }"
+          },
+          "from_dict": {
+            "args": [
+              "cls",
+              "data"
+            ],
+            "calls": [
+              "cls",
+              "data.get",
+              "data.get",
+              "data.get",
+              "isoformat",
+              "datetime.now",
+              "data.get",
+              "isoformat",
+              "datetime.now",
+              "data.get"
+            ],
+            "start_line": 60,
+            "end_line": 67,
+            "code": "def from_dict(cls, data: dict) -> \"EdgeData\":\n        return cls(\n            weight=data.get(\"weight\", 0.1),\n            relation_type=data.get(\"relation_type\", \"related_to\"),\n            created_at=data.get(\"created_at\", datetime.now().isoformat()),\n            updated_at=data.get(\"updated_at\", datetime.now().isoformat()),\n            co_activation_count=data.get(\"co_activation_count\", 1)\n        )"
+          }
+        }
+      },
+      "MemoryGraph": {
+        "inherits": [],
+        "methods": {
+          "__init__": {
+            "args": [
+              "self",
+              "learning_rate",
+              "decay_rate",
+              "activation_threshold",
+              "max_nodes",
+              "max_edges",
+              "prune_threshold"
+            ],
+            "calls": [
+              "nx.DiGraph"
+            ],
+            "start_line": 72,
+            "end_line": 95,
+            "code": "def __init__(\n        self,\n        learning_rate: float = 0.05,\n        decay_rate: float = 0.01,\n        activation_threshold: float = 0.3,\n        max_nodes: int = 1000,\n        max_edges: int = 5000,\n        prune_threshold: float = 0.01\n    ):\n        self.graph = nx.DiGraph()\n        self.learning_rate = learning_rate\n        self.decay_rate = decay_rate\n        self.activation_threshold = activation_threshold\n        self.max_nodes = max_nodes\n        self.max_edges = max_edges\n        self.prune_threshold = prune_threshold\n        \n        # Statistics\n        self.stats = {\n            \"total_updates\": 0,\n            \"nodes_added\": 0,\n            \"edges_added\": 0,\n            \"edges_pruned\": 0\n        }"
+          },
+          "node_count": {
+            "args": [
+              "self"
+            ],
+            "calls": [
+              "self.graph.number_of_nodes"
+            ],
+            "start_line": 98,
+            "end_line": 100,
+            "code": "def node_count(self) -> int:\n        \"\"\"Get number of nodes in graph.\"\"\"\n        return self.graph.number_of_nodes()"
+          },
+          "edge_count": {
+            "args": [
+              "self"
+            ],
+            "calls": [
+              "self.graph.number_of_edges"
+            ],
+            "start_line": 103,
+            "end_line": 105,
+            "code": "def edge_count(self) -> int:\n        \"\"\"Get number of edges in graph.\"\"\"\n        return self.graph.number_of_edges()"
+          },
+          "add_node": {
+            "args": [
+              "self",
+              "node_id",
+              "activation",
+              "node_type",
+              "confidence",
+              "metadata"
+            ],
+            "calls": [
+              "self.graph.has_node",
+              "self._update_node_activation",
+              "self._prune_least_important_nodes",
+              "NodeData",
+              "self.graph.add_node",
+              "node_data.to_dict"
+            ],
+            "start_line": 107,
+            "end_line": 145,
+            "code": "def add_node(\n        self,\n        node_id: str,\n        activation: float = 1.0,\n        node_type: str = \"concept\",\n        confidence: float = 1.0,\n        metadata: Optional[Dict[str, Any]] = None\n    ) -> bool:\n        \"\"\"\n        Add a node to the graph.\n        \n        Args:\n            node_id: Unique identifier for the node\n            activation: Initial activation level\n            node_type: Type of node (concept, code, task, etc.)\n            confidence: Confidence score for this node\n            metadata: Additional metadata\n            \n        Returns:\n            True if node was added, False if it already exists or limit reached\n        \"\"\"\n        if self.graph.has_node(node_id):\n            # Update existing node\n            self._update_node_activation(node_id, activation)\n            return False\n        \n        if self.node_count >= self.max_nodes:\n            self._prune_least_important_nodes()\n        \n        node_data = NodeData(\n            activation=activation,\n            confidence=confidence,\n            node_type=node_type,\n            metadata=metadata or {}\n        )\n        \n        self.graph.add_node(node_id, **node_data.to_dict())\n        self.stats[\"nodes_added\"] += 1\n        return True"
+          },
+          "add_edge": {
+            "args": [
+              "self",
+              "source",
+              "target",
+              "weight",
+              "relation_type"
+            ],
+            "calls": [
+              "self.graph.has_node",
+              "self.add_node",
+              "self.graph.has_node",
+              "self.add_node",
+              "self.graph.has_edge",
+              "self._hebbian_update",
+              "self._prune_weak_edges",
+              "EdgeData",
+              "self.graph.add_edge",
+              "edge_data.to_dict"
+            ],
+            "start_line": 147,
+            "end_line": 183,
+            "code": "def add_edge(\n        self,\n        source: str,\n        target: str,\n        weight: float = 0.1,\n        relation_type: str = \"related_to\"\n    ) -> bool:\n        \"\"\"\n        Add an edge (synapse) between nodes.\n        \n        Args:\n            source: Source node ID\n            target: Target node ID\n            weight: Initial connection weight\n            relation_type: Type of relation\n            \n        Returns:\n            True if edge was added/updated\n        \"\"\"\n        # Ensure nodes exist\n        if not self.graph.has_node(source):\n            self.add_node(source)\n        if not self.graph.has_node(target):\n            self.add_node(target)\n        \n        if self.graph.has_edge(source, target):\n            # Apply Hebbian update\n            self._hebbian_update(source, target, weight)\n            return False\n        \n        if self.edge_count >= self.max_edges:\n            self._prune_weak_edges()\n        \n        edge_data = EdgeData(weight=weight, relation_type=relation_type)\n        self.graph.add_edge(source, target, **edge_data.to_dict())\n        self.stats[\"edges_added\"] += 1\n        return True"
+          },
+          "_hebbian_update": {
+            "args": [
+              "self",
+              "source",
+              "target",
+              "delta"
+            ],
+            "calls": [
+              "get",
+              "get",
+              "get",
+              "min",
+              "isoformat",
+              "datetime.now",
+              "get"
+            ],
+            "start_line": 185,
+            "end_line": 214,
+            "code": "def _hebbian_update(self, source: str, target: str, delta: float = None):\n        \"\"\"\n        Apply Hebbian plasticity rule: \"Neurons that fire together wire together\"\n        \n        Update rule: weight += \u03b7 * activation_source * activation_target\n        \n        Args:\n            source: Source node ID\n            target: Target node ID\n            delta: Optional weight delta override\n        \"\"\"\n        source_activation = self.graph.nodes[source].get(\"activation\", 1.0)\n        target_activation = self.graph.nodes[target].get(\"activation\", 1.0)\n        \n        if source_activation < self.activation_threshold:\n            return\n        \n        # Calculate weight update\n        if delta is None:\n            delta = self.learning_rate * source_activation * target_activation\n        \n        current_weight = self.graph[source][target].get(\"weight\", 0.1)\n        new_weight = min(current_weight + delta, 1.0)  # Cap at 1.0\n        \n        self.graph[source][target][\"weight\"] = new_weight\n        self.graph[source][target][\"updated_at\"] = datetime.now().isoformat()\n        self.graph[source][target][\"co_activation_count\"] = \\\n            self.graph[source][target].get(\"co_activation_count\", 1) + 1\n        \n        self.stats[\"total_updates\"] += 1"
+          },
+          "_update_node_activation": {
+            "args": [
+              "self",
+              "node_id",
+              "new_activation"
+            ],
+            "calls": [
+              "get",
+              "isoformat",
+              "datetime.now"
+            ],
+            "start_line": 216,
+            "end_line": 222,
+            "code": "def _update_node_activation(self, node_id: str, new_activation: float):\n        \"\"\"Update a node's activation level with smoothing.\"\"\"\n        current = self.graph.nodes[node_id].get(\"activation\", 1.0)\n        # Exponential moving average\n        updated = 0.7 * current + 0.3 * new_activation\n        self.graph.nodes[node_id][\"activation\"] = updated\n        self.graph.nodes[node_id][\"updated_at\"] = datetime.now().isoformat()"
+          },
+          "decay_all": {
+            "args": [
+              "self"
+            ],
+            "calls": [
+              "self.graph.edges",
+              "get",
+              "edges_to_remove.append",
+              "self.graph.remove_edge"
+            ],
+            "start_line": 224,
+            "end_line": 239,
+            "code": "def decay_all(self):\n        \"\"\"Apply decay to all edges and prune weak ones.\"\"\"\n        edges_to_remove = []\n        \n        for source, target in self.graph.edges():\n            current_weight = self.graph[source][target].get(\"weight\", 0.1)\n            new_weight = current_weight * (1 - self.decay_rate)\n            \n            if new_weight < self.prune_threshold:\n                edges_to_remove.append((source, target))\n            else:\n                self.graph[source][target][\"weight\"] = new_weight\n        \n        for source, target in edges_to_remove:\n            self.graph.remove_edge(source, target)\n            self.stats[\"edges_pruned\"] += 1"
+          },
+          "_prune_weak_edges": {
+            "args": [
+              "self",
+              "count"
+            ],
+            "calls": [
+              "get",
+              "self.graph.edges",
+              "edges_with_weights.sort",
+              "self.graph.remove_edge"
+            ],
+            "start_line": 241,
+            "end_line": 251,
+            "code": "def _prune_weak_edges(self, count: int = 100):\n        \"\"\"Remove weakest edges to make room for new ones.\"\"\"\n        edges_with_weights = [\n            (s, t, self.graph[s][t].get(\"weight\", 0))\n            for s, t in self.graph.edges()\n        ]\n        edges_with_weights.sort(key=lambda x: x[2])\n        \n        for source, target, _ in edges_with_weights[:count]:\n            self.graph.remove_edge(source, target)\n            self.stats[\"edges_pruned\"] += 1"
+          },
+          "_prune_least_important_nodes": {
+            "args": [
+              "self",
+              "count"
+            ],
+            "calls": [
+              "nx.pagerank",
+              "sorted",
+              "pagerank.items",
+              "self.graph.remove_node",
+              "sorted",
+              "self.graph.nodes",
+              "get",
+              "self.graph.remove_node"
+            ],
+            "start_line": 253,
+            "end_line": 271,
+            "code": "def _prune_least_important_nodes(self, count: int = 50):\n        \"\"\"Remove least important nodes based on pagerank.\"\"\"\n        if self.node_count == 0:\n            return\n        \n        try:\n            pagerank = nx.pagerank(self.graph, alpha=0.85)\n            sorted_nodes = sorted(pagerank.items(), key=lambda x: x[1])\n            \n            for node_id, _ in sorted_nodes[:count]:\n                self.graph.remove_node(node_id)\n        except:\n            # Fallback: remove nodes with lowest activation\n            sorted_nodes = sorted(\n                self.graph.nodes(data=True),\n                key=lambda x: x[1].get(\"activation\", 0)\n            )\n            for node_id, _ in sorted_nodes[:count]:\n                self.graph.remove_node(node_id)"
+          },
+          "update_from_concepts": {
+            "args": [
+              "self",
+              "concepts",
+              "relations",
+              "context_node"
+            ],
+            "calls": [
+              "self.add_node",
+              "self.add_edge",
+              "enumerate",
+              "self.add_edge",
+              "self.add_edge",
+              "self.graph.has_node",
+              "self.add_node",
+              "self.add_edge"
+            ],
+            "start_line": 273,
+            "end_line": 307,
+            "code": "def update_from_concepts(\n        self,\n        concepts: List[str],\n        relations: Optional[List[Tuple[str, str, str]]] = None,\n        context_node: Optional[str] = None\n    ):\n        \"\"\"\n        Update graph from extracted concepts and relations.\n        \n        Args:\n            concepts: List of concept strings\n            relations: Optional list of (source, target, relation_type) tuples\n            context_node: Optional context node to link all concepts to\n        \"\"\"\n        # Add all concepts as nodes\n        for concept in concepts:\n            self.add_node(concept, node_type=\"concept\")\n        \n        # Add explicit relations\n        if relations:\n            for source, target, rel_type in relations:\n                self.add_edge(source, target, relation_type=rel_type)\n        \n        # Create implicit relations between co-occurring concepts\n        for i, concept1 in enumerate(concepts):\n            for concept2 in concepts[i+1:]:\n                self.add_edge(concept1, concept2, weight=0.05, relation_type=\"co_occurs\")\n                self.add_edge(concept2, concept1, weight=0.05, relation_type=\"co_occurs\")\n        \n        # Link to context if provided\n        if context_node:\n            if not self.graph.has_node(context_node):\n                self.add_node(context_node, node_type=\"task\")\n            for concept in concepts:\n                self.add_edge(context_node, concept, relation_type=\"context\")"
+          },
+          "get_related_nodes": {
+            "args": [
+              "self",
+              "node_id",
+              "depth",
+              "min_weight",
+              "max_results"
+            ],
+            "calls": [
+              "self.graph.has_node",
+              "range",
+              "self.graph.successors",
+              "get",
+              "new_frontier.append",
+              "get",
+              "visited.items",
+              "results.sort"
+            ],
+            "start_line": 309,
+            "end_line": 357,
+            "code": "def get_related_nodes(\n        self,\n        node_id: str,\n        depth: int = 2,\n        min_weight: float = 0.05,\n        max_results: int = 20\n    ) -> List[Tuple[str, float, str]]:\n        \"\"\"\n        Get nodes related to a given node.\n        \n        Args:\n            node_id: Starting node ID\n            depth: How many hops to traverse\n            min_weight: Minimum edge weight to follow\n            max_results: Maximum number of results\n            \n        Returns:\n            List of (node_id, relevance_score, node_type) tuples\n        \"\"\"\n        if not self.graph.has_node(node_id):\n            return []\n        \n        visited = {node_id: 1.0}\n        frontier = [(node_id, 1.0)]\n        \n        for _ in range(depth):\n            new_frontier = []\n            for current, current_score in frontier:\n                for neighbor in self.graph.successors(current):\n                    edge_weight = self.graph[current][neighbor].get(\"weight\", 0)\n                    if edge_weight < min_weight:\n                        continue\n                    \n                    new_score = current_score * edge_weight\n                    if neighbor not in visited or visited[neighbor] < new_score:\n                        visited[neighbor] = new_score\n                        new_frontier.append((neighbor, new_score))\n            \n            frontier = new_frontier\n        \n        # Sort by relevance and return\n        results = [\n            (nid, score, self.graph.nodes[nid].get(\"node_type\", \"concept\"))\n            for nid, score in visited.items()\n            if nid != node_id\n        ]\n        results.sort(key=lambda x: x[1], reverse=True)\n        \n        return results[:max_results]"
+          },
+          "get_summary": {
+            "args": [
+              "self",
+              "max_nodes",
+              "max_edges_per_node",
+              "include_weights"
+            ],
+            "calls": [
+              "nx.pagerank",
+              "sorted",
+              "pagerank.items",
+              "sorted",
+              "d.get",
+              "self.graph.nodes",
+              "lines.append",
+              "node_data.get",
+              "node_data.get",
+              "lines.append",
+              "get",
+              "get",
+              "self.graph.successors",
+              "edges.sort",
+              "lines.append",
+              "lines.append",
+              "join"
+            ],
+            "start_line": 359,
+            "end_line": 415,
+            "code": "def get_summary(\n        self,\n        max_nodes: int = 15,\n        max_edges_per_node: int = 5,\n        include_weights: bool = True\n    ) -> str:\n        \"\"\"\n        Get a text summary of the graph for prompt injection.\n        \n        Args:\n            max_nodes: Maximum nodes to include\n            max_edges_per_node: Maximum edges per node\n            include_weights: Include edge weights in summary\n            \n        Returns:\n            Formatted string summary\n        \"\"\"\n        if self.node_count == 0:\n            return \"No prior state. This is a fresh session.\"\n        \n        # Get most important nodes by pagerank\n        try:\n            pagerank = nx.pagerank(self.graph, alpha=0.85)\n            top_nodes = sorted(pagerank.items(), key=lambda x: x[1], reverse=True)[:max_nodes]\n        except:\n            # Fallback to activation-based ranking\n            top_nodes = sorted(\n                [(n, d.get(\"activation\", 0)) for n, d in self.graph.nodes(data=True)],\n                key=lambda x: x[1],\n                reverse=True\n            )[:max_nodes]\n        \n        lines = [\"## Prior Knowledge State (Memory Graph)\"]\n        lines.append(f\"Total: {self.node_count} concepts, {self.edge_count} relations\\n\")\n        \n        for node_id, importance in top_nodes:\n            node_data = self.graph.nodes[node_id]\n            node_type = node_data.get(\"node_type\", \"concept\")\n            activation = node_data.get(\"activation\", 1.0)\n            \n            lines.append(f\"### {node_id} [{node_type}] (relevance: {importance:.3f})\")\n            \n            # Get top edges\n            edges = [\n                (tgt, self.graph[node_id][tgt].get(\"weight\", 0),\n                 self.graph[node_id][tgt].get(\"relation_type\", \"related_to\"))\n                for tgt in self.graph.successors(node_id)\n            ]\n            edges.sort(key=lambda x: x[1], reverse=True)\n            \n            for target, weight, rel_type in edges[:max_edges_per_node]:\n                if include_weights:\n                    lines.append(f\"  \u2192 {target} ({rel_type}, w={weight:.3f})\")\n                else:\n                    lines.append(f\"  \u2192 {target} ({rel_type})\")\n        \n        return \"\\n\".join(lines)"
+          },
+          "search": {
+            "args": [
+              "self",
+              "query",
+              "top_k"
+            ],
+            "calls": [
+              "query.lower",
+              "set",
+              "query_lower.split",
+              "self.graph.nodes",
+              "node_id.lower",
+              "results.append",
+              "results.append",
+              "set",
+              "split",
+              "replace",
+              "node_lower.replace",
+              "len",
+              "max",
+              "len",
+              "results.append",
+              "results.sort"
+            ],
+            "start_line": 417,
+            "end_line": 449,
+            "code": "def search(self, query: str, top_k: int = 10) -> List[Tuple[str, float]]:\n        \"\"\"\n        Simple keyword search in the graph.\n        \n        Args:\n            query: Search query\n            top_k: Number of results\n            \n        Returns:\n            List of (node_id, score) tuples\n        \"\"\"\n        query_lower = query.lower()\n        query_words = set(query_lower.split())\n        \n        results = []\n        for node_id in self.graph.nodes():\n            node_lower = node_id.lower()\n            \n            # Exact match\n            if query_lower == node_lower:\n                results.append((node_id, 1.0))\n            # Contains query\n            elif query_lower in node_lower:\n                results.append((node_id, 0.8))\n            # Word overlap\n            else:\n                node_words = set(node_lower.replace(\"_\", \" \").replace(\"-\", \" \").split())\n                overlap = len(query_words & node_words) / max(len(query_words), 1)\n                if overlap > 0:\n                    results.append((node_id, overlap * 0.6))\n        \n        results.sort(key=lambda x: x[1], reverse=True)\n        return results[:top_k]"
+          },
+          "to_dict": {
+            "args": [
+              "self"
+            ],
+            "calls": [
+              "self.graph.nodes",
+              "self.graph.edges"
+            ],
+            "start_line": 451,
+            "end_line": 471,
+            "code": "def to_dict(self) -> dict:\n        \"\"\"Serialize graph to dictionary.\"\"\"\n        return {\n            \"nodes\": [\n                {\"id\": n, **self.graph.nodes[n]}\n                for n in self.graph.nodes()\n            ],\n            \"edges\": [\n                {\"source\": s, \"target\": t, **self.graph[s][t]}\n                for s, t in self.graph.edges()\n            ],\n            \"config\": {\n                \"learning_rate\": self.learning_rate,\n                \"decay_rate\": self.decay_rate,\n                \"activation_threshold\": self.activation_threshold,\n                \"max_nodes\": self.max_nodes,\n                \"max_edges\": self.max_edges,\n                \"prune_threshold\": self.prune_threshold\n            },\n            \"stats\": self.stats\n        }"
+          },
+          "from_dict": {
+            "args": [
+              "cls",
+              "data"
+            ],
+            "calls": [
+              "data.get",
+              "cls",
+              "config.get",
+              "config.get",
+              "config.get",
+              "config.get",
+              "config.get",
+              "config.get",
+              "data.get",
+              "node.pop",
+              "graph.graph.add_node",
+              "data.get",
+              "edge.pop",
+              "edge.pop",
+              "graph.graph.add_edge",
+              "data.get"
+            ],
+            "start_line": 474,
+            "end_line": 500,
+            "code": "def from_dict(cls, data: dict) -> \"MemoryGraph\":\n        \"\"\"Deserialize graph from dictionary.\"\"\"\n        config = data.get(\"config\", {})\n        graph = cls(\n            learning_rate=config.get(\"learning_rate\", 0.05),\n            decay_rate=config.get(\"decay_rate\", 0.01),\n            activation_threshold=config.get(\"activation_threshold\", 0.3),\n            max_nodes=config.get(\"max_nodes\", 1000),\n            max_edges=config.get(\"max_edges\", 5000),\n            prune_threshold=config.get(\"prune_threshold\", 0.01)\n        )\n        \n        # Add nodes\n        for node in data.get(\"nodes\", []):\n            node_id = node.pop(\"id\")\n            graph.graph.add_node(node_id, **node)\n        \n        # Add edges\n        for edge in data.get(\"edges\", []):\n            source = edge.pop(\"source\")\n            target = edge.pop(\"target\")\n            graph.graph.add_edge(source, target, **edge)\n        \n        # Restore stats\n        graph.stats = data.get(\"stats\", graph.stats)\n        \n        return graph"
+          },
+          "to_json": {
+            "args": [
+              "self"
+            ],
+            "calls": [
+              "json.dumps",
+              "self.to_dict"
+            ],
+            "start_line": 502,
+            "end_line": 504,
+            "code": "def to_json(self) -> str:\n        \"\"\"Serialize graph to JSON string.\"\"\"\n        return json.dumps(self.to_dict(), indent=2)"
+          },
+          "from_json": {
+            "args": [
+              "cls",
+              "json_str"
+            ],
+            "calls": [
+              "cls.from_dict",
+              "json.loads"
+            ],
+            "start_line": 507,
+            "end_line": 509,
+            "code": "def from_json(cls, json_str: str) -> \"MemoryGraph\":\n        \"\"\"Deserialize graph from JSON string.\"\"\"\n        return cls.from_dict(json.loads(json_str))"
+          },
+          "clear": {
+            "args": [
+              "self"
+            ],
+            "calls": [
+              "self.graph.clear"
+            ],
+            "start_line": 511,
+            "end_line": 519,
+            "code": "def clear(self):\n        \"\"\"Clear the entire graph.\"\"\"\n        self.graph.clear()\n        self.stats = {\n            \"total_updates\": 0,\n            \"nodes_added\": 0,\n            \"edges_added\": 0,\n            \"edges_pruned\": 0\n        }"
+          },
+          "get_stats": {
+            "args": [
+              "self"
+            ],
+            "calls": [
+              "nx.density"
+            ],
+            "start_line": 521,
+            "end_line": 528,
+            "code": "def get_stats(self) -> dict:\n        \"\"\"Get graph statistics.\"\"\"\n        return {\n            **self.stats,\n            \"node_count\": self.node_count,\n            \"edge_count\": self.edge_count,\n            \"density\": nx.density(self.graph) if self.node_count > 0 else 0\n        }"
+          }
+        }
+      }
+    },
+    "imports": [
+      "json",
+      "math",
+      "typing",
+      "dataclasses",
+      "datetime",
+      "networkx"
+    ],
+    "folder": "graph",
+    "module": "memory_graph"
+  },
+  "repos\\ATLAS\\parser\\repo_cloner.py": {
+    "file_path": "repos\\ATLAS\\parser\\repo_cloner.py",
+    "functions": {},
+    "classes": {
+      "RepoCloner": {
+        "inherits": [],
+        "methods": {
+          "__init__": {
+            "args": [
+              "self",
+              "base_dir"
+            ],
+            "calls": [
+              "os.makedirs"
+            ],
+            "start_line": 7,
+            "end_line": 9,
+            "code": "def __init__(self, base_dir=\"repos\"):\n        self.base_dir = base_dir\n        os.makedirs(self.base_dir, exist_ok=True)"
+          },
+          "_remove_readonly": {
+            "args": [
+              "self",
+              "func",
+              "path",
+              "excinfo"
+            ],
+            "calls": [
+              "os.chmod",
+              "func"
+            ],
+            "start_line": 11,
+            "end_line": 13,
+            "code": "def _remove_readonly(self, func, path, excinfo):\n        os.chmod(path, stat.S_IWRITE)\n        func(path)"
+          },
+          "clone_repo": {
+            "args": [
+              "self",
+              "repo_url"
+            ],
+            "calls": [
+              "replace",
+              "repo_url.split",
+              "os.path.join",
+              "os.path.exists",
+              "Repo",
+              "print",
+              "repo.remotes.origin.pull",
+              "print",
+              "shutil.rmtree",
+              "print",
+              "Repo.clone_from",
+              "print",
+              "print",
+              "Repo.clone_from",
+              "print"
+            ],
+            "start_line": 15,
+            "end_line": 37,
+            "code": "def clone_repo(self, repo_url):\n        repo_name = repo_url.split(\"/\")[-1].replace(\".git\", \"\")\n        clone_path = os.path.join(self.base_dir, repo_name)\n\n        if os.path.exists(clone_path):\n            try:\n                # Try to open existing repo\n                repo = Repo(clone_path)\n                print(f\"Repo already exists. Pulling latest changes from {repo_url}...\")\n                repo.remotes.origin.pull()\n            except GitCommandError:\n                # If repo is corrupted or not a git repo, delete and reclone\n                print(\"Existing folder is not a valid git repo. Deleting and recloning...\")\n                shutil.rmtree(clone_path, onerror=self._remove_readonly)\n                print(f\"Cloning {repo_url}...\")\n                Repo.clone_from(repo_url, clone_path)\n                print(\"Clone completed.\")\n        else:\n            print(f\"Cloning {repo_url}...\")\n            Repo.clone_from(repo_url, clone_path)\n            print(\"Clone completed.\")\n\n        return clone_path"
+          }
+        }
+      }
+    },
+    "imports": [
+      "os",
+      "shutil",
+      "stat",
+      "git"
+    ],
+    "folder": "parser",
+    "module": "repo_cloner"
+  },
+  "repos\\ATLAS\\parser\\repo_parser.py": {
+    "file_path": "repos\\ATLAS\\parser\\repo_parser.py",
+    "functions": {},
+    "classes": {
+      "FunctionCallCollector": {
+        "inherits": [
+          "ast.NodeVisitor"
+        ],
+        "methods": {
+          "__init__": {
+            "args": [
+              "self"
+            ],
+            "calls": [],
+            "start_line": 7,
+            "end_line": 8,
+            "code": "def __init__(self):\n        self.calls=[]"
+          },
+          "visit_Call": {
+            "args": [
+              "self",
+              "node"
+            ],
+            "calls": [
+              "isinstance",
+              "self.calls.append",
+              "isinstance",
+              "isinstance",
+              "name_chain.append",
+              "isinstance",
+              "name_chain.append",
+              "join",
+              "reversed",
+              "self.calls.append",
+              "self.generic_visit"
+            ],
+            "start_line": 10,
+            "end_line": 27,
+            "code": "def visit_Call(self, node):\n        if isinstance(node.func,ast.Name):\n            self.calls.append(node.func.id)\n\n        elif isinstance(node.func,ast.Attribute):\n            name_chain=[]\n            current=node.func\n\n            while isinstance(current,ast.Attribute):\n                name_chain.append(current.attr)\n                current=current.value\n            \n            if isinstance(current,ast.Name):\n                name_chain.append(current.id)\n\n            full_name=\".\".join(reversed(name_chain))\n            self.calls.append(full_name)\n        self.generic_visit(node)"
+          }
+        }
+      },
+      "CodeParser": {
+        "inherits": [],
+        "methods": {
+          "get_source_segment": {
+            "args": [
+              "self",
+              "file_path",
+              "node"
+            ],
+            "calls": [
+              "open",
+              "f.read",
+              "ast.get_source_segment"
+            ],
+            "start_line": 31,
+            "end_line": 34,
+            "code": "def get_source_segment(self,file_path,node):\n        with open(file_path,\"r\",encoding='utf-8') as f:\n            source=f.read()\n        return ast.get_source_segment(source,node)"
+          },
+          "extract_function_data": {
+            "args": [
+              "self",
+              "file_path",
+              "node"
+            ],
+            "calls": [
+              "FunctionCallCollector",
+              "collector.visit",
+              "self.get_source_segment",
+              "getattr"
+            ],
+            "start_line": 36,
+            "end_line": 48,
+            "code": "def extract_function_data(self,file_path,node):\n        collector=FunctionCallCollector()\n        collector.visit(node)\n\n        code=self.get_source_segment(file_path,node)\n        args=[arg.arg for arg in node.args.args]\n        return {\n            \"args\":args,\n            \"calls\":collector.calls,\n            \"start_line\": node.lineno,\n            \"end_line\": getattr(node, \"end_lineno\", node.lineno),\n            \"code\": code\n        }"
+          },
+          "parse_file": {
+            "args": [
+              "self",
+              "file_path"
+            ],
+            "calls": [
+              "open",
+              "f.read",
+              "ast.parse",
+              "print",
+              "isinstance",
+              "self.extract_function_data",
+              "isinstance",
+              "isinstance",
+              "self.extract_function_data",
+              "isinstance",
+              "bases.append",
+              "isinstance",
+              "isinstance",
+              "name_chain.append",
+              "isinstance",
+              "name_chain.append",
+              "bases.append",
+              "join",
+              "reversed",
+              "isinstance",
+              "imports.append",
+              "isinstance",
+              "imports.append"
+            ],
+            "start_line": 50,
+            "end_line": 107,
+            "code": "def parse_file(self,file_path):\n\n        with open(file_path,\"r\",encoding='utf-8') as f:\n            source=f.read()\n        \n        try:\n            tree=ast.parse(source)\n        \n        except SyntaxError:\n            print(f\"skipping file with syntax error ..  {file_path}\")\n            return None\n        functions={}\n        classes={}\n        imports=[]\n\n        for node in tree.body:\n            if isinstance(node,ast.FunctionDef):\n                functions[node.name]= self.extract_function_data(file_path,node)\n\n            elif isinstance(node,ast.ClassDef):\n                method_dict={}\n\n                for item in node.body:\n                    if isinstance(item,ast.FunctionDef):\n                        method_dict[item.name]= self.extract_function_data(file_path,item)\n\n                bases=[]\n                for base in node.bases:\n                    if isinstance(base,ast.Name):\n                        bases.append(base.id)\n                    elif isinstance(base, ast.Attribute):\n                        name_chain = []\n                        current = base\n                        while isinstance(current, ast.Attribute):\n                            name_chain.append(current.attr)\n                            current = current.value\n                        if isinstance(current, ast.Name):\n                            name_chain.append(current.id)\n                        bases.append(\".\".join(reversed(name_chain)))\n\n                classes[node.name]={\n                    \"inherits\":bases,\n                    \"methods\":method_dict\n                }\n            elif isinstance(node,ast.Import):\n                for alias in node.names:\n                    imports.append(alias.name)\n            \n            elif isinstance(node,ast.ImportFrom):\n                if node.module:\n                    imports.append(node.module)\n            \n        return {\n            \"file_path\":file_path,\n            \"functions\":functions,\n            \"classes\":classes,\n            \"imports\":imports\n        }"
+          },
+          "parse_repository": {
+            "args": [
+              "self",
+              "repo_path"
+            ],
+            "calls": [
+              "os.walk",
+              "file.endswith",
+              "os.path.join",
+              "self.parse_file"
+            ],
+            "start_line": 109,
+            "end_line": 121,
+            "code": "def parse_repository(self,repo_path):\n        parsed_data={}\n\n        for root, _, files in os.walk(repo_path):\n            for file in files:\n                if file.endswith(\".py\"):\n                    full_path=os.path.join(root,file)\n\n                    result=self.parse_file(full_path)\n\n                    if result:\n                        parsed_data[full_path]=result \n        return parsed_data"
+          }
+        }
+      }
+    },
+    "imports": [
+      "ast",
+      "os"
+    ],
+    "folder": "parser",
+    "module": "repo_parser"
+  },
+  "repos\\ATLAS\\parser\\__init__.py": {
+    "file_path": "repos\\ATLAS\\parser\\__init__.py",
+    "functions": {},
+    "classes": {},
+    "imports": [],
+    "folder": "parser",
+    "module": "__init__"
+  },
+  "repos\\ATLAS\\semantic\\embeddings.py": {
+    "file_path": "repos\\ATLAS\\semantic\\embeddings.py",
+    "functions": {
+      "get_embeddings": {
+        "args": [
+          "text"
+        ],
+        "calls": [
+          "tolist",
+          "embedder.encode"
+        ],
+        "start_line": 18,
+        "end_line": 19,
+        "code": "def get_embeddings(text: str):\n    return embedder.encode(text).tolist()"
+      },
+      "build_semantic_memmory": {
+        "args": [
+          "parsed_repo"
+        ],
+        "calls": [
+          "parsed_repo.items",
+          "data.get",
+          "data.get",
+          "join",
+          "data.get",
+          "items",
+          "data.get",
+          "func_data.get",
+          "items",
+          "data.get",
+          "class_data.get",
+          "get_embeddings",
+          "collection.add",
+          "print",
+          "items",
+          "data.get",
+          "func_data.get",
+          "get_embeddings",
+          "collection.add",
+          "print",
+          "items",
+          "data.get",
+          "class_data.get",
+          "get_embeddings",
+          "collection.add",
+          "print",
+          "time.sleep",
+          "print",
+          "print",
+          "collection.count"
+        ],
+        "start_line": 22,
+        "end_line": 107,
+        "code": "def build_semantic_memmory(parsed_repo: Dict[str, Dict]):\n    doc_id = 0\n\n    for file_path, data in parsed_repo.items():\n\n        folder = data.get(\"folder\", \"\")\n        module = data.get(\"module\", \"\")\n\n        # ----------------- FILE LEVEL EMBEDDING -----------------\n        file_text = \"\"\n        file_text += \"\\n\".join(data.get(\"imports\", [])) + \"\\n\"\n        file_text += f\"# module: {module} folder: {folder}\\n\"\n\n        for func_name, func_data in data.get(\"functions\", {}).items():\n            file_text += func_data.get(\"code\", func_name) + \"\\n\"\n\n        for class_name, class_data in data.get(\"classes\", {}).items():\n            # class_data may not have 'code' if parser doesn't store full class code\n            class_code = class_data.get(\"code\", \"\")\n            file_text += class_code + \"\\n\"\n\n        try:\n            embedding = get_embeddings(file_text)\n            collection.add(\n                documents=[file_text],\n                embeddings=[embedding],\n                metadatas=[{\n                    \"type\": \"file\",\n                    \"path\": file_path,\n                    \"folder\": folder,\n                    \"module\": module\n                }],\n                ids=[f\"doc_{doc_id}\"]\n            )\n            doc_id += 1\n        except Exception as e:\n            print(f\"Embedding failed for file {file_path}: {e}\")\n\n        # ----------------- FUNCTION LEVEL EMBEDDING -----------------\n        for func_name, func_data in data.get(\"functions\", {}).items():\n            func_code = func_data.get(\"code\", func_name)\n            try:\n                embedding = get_embeddings(func_code)\n                collection.add(\n                    documents=[func_code],\n                    embeddings=[embedding],\n                    metadatas=[{\n                        \"type\": \"function\",\n                        \"path\": file_path,\n                        \"folder\": folder,\n                        \"module\": module,\n                        \"name\": func_name\n                    }],\n                    ids=[f\"doc_{doc_id}\"]\n                )\n                doc_id += 1\n            except Exception as e:\n                print(f\"Embedding failed for function {func_name}: {e}\")\n\n        # ----------------- CLASS LEVEL EMBEDDING -----------------\n        for class_name, class_data in data.get(\"classes\", {}).items():\n            class_code = class_data.get(\"code\", class_name)  # fallback to name\n            try:\n                embedding = get_embeddings(class_code)\n                collection.add(\n                    documents=[class_code],\n                    embeddings=[embedding],\n                    metadatas=[{\n                        \"type\": \"class\",\n                        \"path\": file_path,\n                        \"folder\": folder,\n                        \"module\": module,\n                        \"name\": class_name\n                    }],\n                    ids=[f\"doc_{doc_id}\"]\n                )\n                doc_id += 1\n            except Exception as e:\n                print(f\"Embedding failed for class {class_name}: {e}\")\n\n        # slight throttle to avoid overloading\n        time.sleep(0.1)\n\n    print(\"Semantic memory stored in ChromaDB\")\n    print(\"Collection info:\", collection.count())\n    return collection"
+      }
+    },
+    "classes": {},
+    "imports": [
+      "os",
+      "time",
+      "chromadb",
+      "chromadb.config",
+      "typing",
+      "sentence_transformers"
+    ],
+    "folder": "semantic",
+    "module": "embeddings"
+  },
+  "repos\\ATLAS\\semantic\\retrieval.py": {
+    "file_path": "repos\\ATLAS\\semantic\\retrieval.py",
+    "functions": {},
+    "classes": {
+      "CodeRetriever": {
+        "inherits": [],
+        "methods": {
+          "__init__": {
+            "args": [
+              "self",
+              "collection",
+              "graph_store",
+              "top_k",
+              "embed_model_name"
+            ],
+            "calls": [
+              "SentenceTransformer"
+            ],
+            "start_line": 8,
+            "end_line": 13,
+            "code": "def __init__(self, collection: Collection, graph_store: GraphStore, top_k: int = 5,\n                 embed_model_name: str = \"sentence-transformers/all-MiniLM-L6-v2\"):\n        self.collection = collection\n        self.graph_store = graph_store\n        self.top_k = top_k\n        self.embed_model = SentenceTransformer(embed_model_name)"
+          },
+          "_build_node_id": {
+            "args": [
+              "self",
+              "metadata"
+            ],
+            "calls": [
+              "metadata.get",
+              "metadata.get",
+              "metadata.get"
+            ],
+            "start_line": 15,
+            "end_line": 29,
+            "code": "def _build_node_id(self, metadata: dict) -> str:\n        \"\"\"Reconstruct full node ID to match graph builder naming.\"\"\"\n        node_type = metadata.get(\"type\")\n        path = metadata.get(\"path\")\n        name = metadata.get(\"name\")\n\n        if node_type == \"function\":\n            return f\"{path}::{name}\"\n        elif node_type == \"class\":\n            return f\"{path}::{name}\"\n        elif node_type == \"method\":\n            # For methods, path should already include class name\n            return f\"{path}::{name}\"\n        else:\n            return path"
+          },
+          "retrieve": {
+            "args": [
+              "self",
+              "query",
+              "expand_depth",
+              "node_types"
+            ],
+            "calls": [
+              "tolist",
+              "self.embed_model.encode",
+              "self.collection.query",
+              "enumerate",
+              "self._build_node_id",
+              "metadata.get",
+              "sem_nodes.append",
+              "self.collection.get",
+              "np.array",
+              "np.array",
+              "np.dot",
+              "np.linalg.norm",
+              "np.linalg.norm",
+              "float",
+              "set",
+              "self.graph_store.get_full_downstream",
+              "self.graph_store.get_full_upstream",
+              "expanded_nodes.update",
+              "expanded_nodes.update",
+              "expanded_nodes.update",
+              "get",
+              "sem_scores.get",
+              "combined_results.sort"
+            ],
+            "start_line": 31,
+            "end_line": 87,
+            "code": "def retrieve(self, query: str, expand_depth: int = 2,\n                 node_types: List[str] = [\"function\", \"method\", \"class\"]):\n        # Encode the query\n        query_vec = self.embed_model.encode(query).tolist()\n\n        # Query Chroma collection\n        results = self.collection.query(\n            query_embeddings=[query_vec],\n            n_results=self.top_k\n        )\n\n        sem_nodes = []\n        sem_scores = {}\n\n        # Process each returned document\n        for i, metadata in enumerate(results['metadatas'][0]):\n            node_id = self._build_node_id(metadata)\n            node_type = metadata.get(\"type\")\n\n            if node_type in node_types and node_id in self.graph_store.graph.nodes:\n                sem_nodes.append(node_id)\n\n                # If Chroma provides distances, use them\n                if results['distances'] and results['distances'][0]:\n                    distance = results['distances'][0][i]\n                    sem_scores[node_id] = 1 - distance  # cosine distance -> similarity\n                else:\n                    # Fallback: compute cosine similarity manually\n                    node_embedding_data = self.collection.get(ids=[results['ids'][0][i]])\n                    node_embedding = np.array(node_embedding_data['embeddings'][0][0])\n                    query_vec_np = np.array(query_vec)\n                    cos_sim = np.dot(query_vec_np, node_embedding) / (\n                        np.linalg.norm(query_vec_np) * np.linalg.norm(node_embedding)\n                    )\n                    sem_scores[node_id] = float(cos_sim)\n\n        # Expand nodes in the graph (upstream and downstream)\n        expanded_nodes = set()\n        for node in sem_nodes:\n            downstream = self.graph_store.get_full_downstream(node)\n            upstream = self.graph_store.get_full_upstream(node)\n            expanded_nodes.update(downstream)\n            expanded_nodes.update(upstream)\n        expanded_nodes.update(sem_nodes)\n\n        # Filter by node types if requested\n        if node_types:\n            expanded_nodes = [\n                n for n in expanded_nodes\n                if self.graph_store.graph.nodes[n].get(\"type\") in node_types\n            ]\n\n        # Combine results with similarity scores (default 0.5 if missing)\n        combined_results = [(node, sem_scores.get(node, 0.5)) for node in expanded_nodes]\n        combined_results.sort(key=lambda x: x[1], reverse=True)\n\n        return combined_results"
+          }
+        }
+      }
+    },
+    "imports": [
+      "sentence_transformers",
+      "chromadb.api.models.Collection",
+      "graph.graph_store",
+      "typing",
+      "numpy"
+    ],
+    "folder": "semantic",
+    "module": "retrieval"
+  },
+  "repos\\ATLAS\\semantic\\__init__.py": {
+    "file_path": "repos\\ATLAS\\semantic\\__init__.py",
+    "functions": {},
+    "classes": {},
+    "imports": [],
+    "folder": "semantic",
+    "module": "__init__"
+  },
+  "repos\\ATLAS\\utils\\context_builder.py": {
+    "file_path": "repos\\ATLAS\\utils\\context_builder.py",
+    "functions": {
+      "build_context": {
+        "args": [
+          "retriever",
+          "graph_store",
+          "query",
+          "top_k"
+        ],
+        "calls": [
+          "retriever.retrieve",
+          "graph_store.get_upstream_dependencies",
+          "folders.append",
+          "max",
+          "set",
+          "set",
+          "graph_store.get_upstream_dependencies",
+          "imports.update",
+          "graph_store.graph.nodes.get"
+        ],
+        "start_line": 3,
+        "end_line": 27,
+        "code": "def build_context(retriever,graph_store:GraphStore,query:str,top_k:int=5):\n    results=retriever.retrieve(query)\n    folders=[]\n    for node,_ in results:\n        preds=graph_store.get_upstream_dependencies(node,types=[\"file\"])\n        if preds:\n            folders.append(preds[0])\n    target_folder=max(set(folders),key=folders.count) if folders else \"new_folder\"\n\n    imports=set()\n    for node,_ in results:\n        preds=graph_store.get_upstream_dependencies(node,types=[\"file\"])\n        imports.update(preds)\n\n    relevant_code={}\n    for node,_ in results[:top_k]:\n        node_data=graph_store.graph.nodes.get(node)\n        if node_data and \"code\" in node_data:\n            relevant_code[node]=node_data[\"code\"]\n    \n    return {\n        \"target_folder\":target_folder,\n        \"imports\":imports,\n        \"relevant_code_snippets\":relevant_code\n    }"
+      }
+    },
+    "classes": {},
+    "imports": [
+      "graph.graph_store"
+    ],
+    "folder": "utils",
+    "module": "context_builder"
+  },
+  "repos\\ATLAS\\utils\\executor.py": {
+    "file_path": "repos\\ATLAS\\utils\\executor.py",
+    "functions": {
+      "execute_plan": {
+        "args": [
+          "plan_code",
+          "target_folder",
+          "file_name"
+        ],
+        "calls": [
+          "os.makedirs",
+          "os.path.join",
+          "open",
+          "f.write"
+        ],
+        "start_line": 2,
+        "end_line": 7,
+        "code": "def execute_plan(plan_code:str,target_folder:str,file_name:str=\"new_feature.py\"):\n    os.makedirs(target_folder, exist_ok=True)\n    file_path = os.path.join(target_folder, file_name)\n    with open(file_path, \"w\", encoding=\"utf-8\") as f:\n        f.write(plan_code)\n    return file_path"
+      }
+    },
+    "classes": {},
+    "imports": [
+      "os"
+    ],
+    "folder": "utils",
+    "module": "executor"
+  },
+  "repos\\ATLAS\\utils\\llm_call.py": {
+    "file_path": "repos\\ATLAS\\utils\\llm_call.py",
+    "functions": {
+      "ask_llm": {
+        "args": [
+          "prompt",
+          "max_tokens",
+          "temperature"
+        ],
+        "calls": [
+          "bedrock_client.invoke_model",
+          "BytesIO",
+          "encode",
+          "json.dumps",
+          "read",
+          "raw_body.decode",
+          "print",
+          "json.loads",
+          "get",
+          "str"
+        ],
+        "start_line": 22,
+        "end_line": 56,
+        "code": "def ask_llm(prompt: str, max_tokens: int = 512, temperature: float = 0.5) -> str:\n    import json, boto3\n    from io import BytesIO\n\n    payload = {\n        \"anthropic_version\": \"bedrock-2023-05-31\",\n        \"max_tokens\": max_tokens,\n        \"temperature\": temperature,\n        \"messages\": [{\"role\": \"user\", \"content\": prompt}]\n    }\n\n    response = bedrock_client.invoke_model(\n        modelId=LLM_MODEL,\n        body=BytesIO(json.dumps(payload).encode(\"utf-8\")),\n        contentType=\"application/json\",\n        accept=\"application/json\"\n    )\n\n    raw_body = response[\"body\"].read()\n    raw_text = raw_body.decode()\n    print(\"\\n--- RAW RESPONSE ---\\n\", raw_text, \"\\n--- END RAW RESPONSE ---\\n\")\n\n    try:\n        result = json.loads(raw_text)\n        # Check multiple structures\n        if \"choices\" in result:\n            return result[\"choices\"][0][\"message\"][\"content\"]\n        elif \"content\" in result:\n            return result[\"content\"][0].get(\"text\", \"\")\n        elif \"completion\" in result:\n            return result[\"completion\"]\n        else:\n            return str(result)\n    except json.JSONDecodeError:\n        return raw_text"
+      }
+    },
+    "classes": {},
+    "imports": [
+      "json",
+      "boto3",
+      "io",
+      "typing"
+    ],
+    "folder": "utils",
+    "module": "llm_call"
+  },
+  "repos\\ATLAS\\utils\\planner.py": {
+    "file_path": "repos\\ATLAS\\utils\\planner.py",
+    "functions": {
+      "explain_repo": {
+        "args": [
+          "context",
+          "user_query"
+        ],
+        "calls": [
+          "context.get",
+          "join",
+          "chr",
+          "context.get",
+          "context.get",
+          "join",
+          "list",
+          "keys",
+          "context.get",
+          "ask_llm"
+        ],
+        "start_line": 5,
+        "end_line": 34,
+        "code": "def explain_repo(context: dict, user_query: str):\n    prompt = f\"\"\"\nYou are an expert codebase analyst.\n\nYour job is to HELP the user understand the repository based on context.\n\n# Repository Overview:\n{context.get('repo_summary', 'No summary available.')}\n\n# Module Summaries:\n{chr(10).join([f\"- {c['summary']}\" for c in context.get('module_summaries', [])])}\n\n# Repository Structure:\n{context.get('repo_structure', 'Not provided.')}\n\n# Relevant Code Snippets (names only):\n{', '.join(list(context.get('retrieved_code', {}).keys()))}\n\n# User Question:\n{user_query}\n\nInstructions:\n- Answer the question clearly and directly\n- Explain flow (how data moves, which functions are used)\n- Reference relevant functions/modules when needed\n- Keep it structured but not too long\n- DO NOT generate code unless explicitly asked\n\"\"\"\n\n    return ask_llm(prompt)"
+      },
+      "plan_code": {
+        "args": [
+          "context",
+          "user_query"
+        ],
+        "calls": [
+          "context.get",
+          "join",
+          "context.get",
+          "context.get",
+          "context.get",
+          "context.get",
+          "join",
+          "list",
+          "keys",
+          "context.get",
+          "ask_llm"
+        ],
+        "start_line": 55,
+        "end_line": 84,
+        "code": "def plan_code(context: dict, user_query: str):\n    prompt = f\"\"\"\nYou are adding a new feature to a Python repository.\n\n# Repository Overview:\n{context.get('repo_summary', 'No summary available.')}\n\n# Module Summaries:\n{', '.join([c['summary'] for c in context.get('module_summaries', [])])}\n\n# Repository Structure:\n{context.get('repo_structure', 'Not provided.')}\n\n# Target folder for new code: {context.get('target_folder', 'new_folder')}\n# Suggested imports: {context.get('imports', [])}\n\n# Relevant code snippets:\n{', '.join(list(context.get('retrieved_code', {}).keys()))}\n\n# Task:\n{user_query}\n\nInstructions:\n- Write a Python file skeleton (do NOT overwrite existing files)\n- Include proper imports, class/function definitions\n- Reference the relevant functions/methods from the retrieved snippets\n- Make the code integrate with existing repo structure\n- Do not write explanations, only code\n\"\"\"\n    return ask_llm(prompt)"
+      }
+    },
+    "classes": {},
+    "imports": [
+      "llm_call",
+      "llm_call",
+      "llm_call"
+    ],
+    "folder": "utils",
+    "module": "planner"
+  },
+  "repos\\ATLAS\\utils\\__init__.py": {
+    "file_path": "repos\\ATLAS\\utils\\__init__.py",
+    "functions": {},
+    "classes": {},
+    "imports": [],
+    "folder": "utils",
+    "module": "__init__"
+  }
+}

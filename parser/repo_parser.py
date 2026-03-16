@@ -117,5 +117,7 @@ class CodeParser:
                     result=self.parse_file(full_path)
 
                     if result:
-                        parsed_data[full_path]=result 
+                        result["folder"] = os.path.relpath(root, repo_path)
+                        result["module"] = file.replace(".py", "")
+                        parsed_data[full_path]=result
         return parsed_data

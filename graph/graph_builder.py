@@ -23,19 +23,21 @@ class CodeGraphBuilder:
                     method_lookup[key]=node
             
         for file_path, data in parsed_repo.items():
-            self.graph.add_node(file_path,type="file")
-
+            folder = data.get("folder", "")
+            module = data.get("module", "")
+            self.graph.add_node(file_path, type="file", folder=folder, module=module)
 
             for imp in data.get("imports",[]):
                 self.graph.add_node(imp,type="module")
                 self.graph.add_edge(file_path,imp,relation="imports")
-
 
             for func_name, func_data in data.get("functions",{}).items():
                 func_node=f"{file_path}::{func_name}"
                 self.graph.add_node(
                     func_node,
                     type="function",
+                    folder=folder,
+                    module=module,
                     code=func_data["code"],
                     args=func_data["args"],
                     start_line=func_data["start_line"],
@@ -43,33 +45,27 @@ class CodeGraphBuilder:
                 )
                 self.graph.add_edge(file_path,func_node,relation="defines")
 
-
             for cls_name, cls_data in data.get("classes", {}).items():
-
                 cls_node = f"{file_path}::{cls_name}"
-
-                self.graph.add_node(cls_node, type="class")
+                self.graph.add_node(cls_node, type="class", folder=folder, module=module)
                 self.graph.add_edge(file_path, cls_node, relation="defines")
 
-                # Inheritance
                 for parent in cls_data.get("inherits", []):
                     self.graph.add_node(parent, type="class")
                     self.graph.add_edge(cls_node, parent, relation="inherits")
 
-                # Methods
                 for method_name, method_data in cls_data.get("methods", {}).items():
-
                     method_node = f"{file_path}::{cls_name}::{method_name}"
-
                     self.graph.add_node(
                         method_node,
                         type="method",
+                        folder=folder,
+                        module=module,
                         code=method_data["code"],
                         args=method_data["args"],
                         start_line=method_data["start_line"],
                         end_line=method_data["end_line"]
                     )
-
                     self.graph.add_edge(cls_node, method_node, relation="defines")
 
 

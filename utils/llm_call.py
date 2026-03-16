@@ -17,14 +17,10 @@ bedrock_client = boto3.client(
 
 
 # ---------------------------
-# Invoke Claude via Bedrock
+# Invoke Mistral via Bedrock
 # ---------------------------
-def ask_llm(prompt: str, max_tokens: int = 512, temperature: float = 0.5) -> str:
-    import json, boto3
-    from io import BytesIO
-
+def ask_llm(prompt: str, max_tokens: int = 4096, temperature: float = 0.5) -> str:
     payload = {
-        "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": max_tokens,
         "temperature": temperature,
         "messages": [{"role": "user", "content": prompt}]
