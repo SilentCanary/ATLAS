@@ -25,7 +25,7 @@ Enable **context-aware code generation** where the system can:
 ## ⚙️ System Architecture
 
 The assistant is designed as a pipeline of interconnected components:
-
+```
 Repo Parser
      ↓
 Structure Graph
@@ -41,7 +41,7 @@ Planner (LLM)
 Action Executor
      ↓
 Repository Modification
-
+```
 
 ### 🔍 Flow Explained
 1. **Repo Parser** → Parses `.py` files using AST to extract functions, classes, imports, and calls.  
