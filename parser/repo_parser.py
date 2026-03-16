@@ -1,5 +1,7 @@
-import ast 
+import ast
 import os
+
+from parser.language_parsers import detect_language, get_parser, SUPPORTED_EXTENSIONS
 
 class FunctionCallCollector(ast.NodeVisitor):
     #used to collect all the function and method call inside a function or method
@@ -111,13 +113,43 @@ class CodeParser:
 
         for root, _, files in os.walk(repo_path):
             for file in files:
-                if file.endswith(".py"):
-                    full_path=os.path.join(root,file)
+                full_path=os.path.join(root,file)
+                _, ext = os.path.splitext(file)
+                ext_lower = ext.lower()
 
+                # Python: use existing high-fidelity AST parser
+                if ext_lower == ".py":
                     result=self.parse_file(full_path)
-
                     if result:
                         result["folder"] = os.path.relpath(root, repo_path)
                         result["module"] = file.replace(".py", "")
+                        result["language"] = "python"
                         parsed_data[full_path]=result
+
+                # Other supported languages: dispatch to language parser
+                elif ext_lower in SUPPORTED_EXTENSIONS:
+                    # Skip binary files (null bytes in first 8KB)
+                    try:
+                        with open(full_path, "rb") as bf:
+                            chunk = bf.read(8192)
+                            if b"\x00" in chunk:
+                                continue
+                    except Exception:
+                        continue
+
+                    # Skip very large files
+                    try:
+                        if os.path.getsize(full_path) > 500_000:
+                            continue
+                    except Exception:
+                        continue
+
+                    language = detect_language(full_path)
+                    lang_parser = get_parser(language)
+                    result = lang_parser.parse_file(full_path)
+                    if result:
+                        result["folder"] = os.path.relpath(root, repo_path)
+                        result["module"] = file.rsplit(".", 1)[0]
+                        parsed_data[full_path] = result
+
         return parsed_data

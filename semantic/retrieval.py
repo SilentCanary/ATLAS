@@ -36,7 +36,7 @@ class CodeRetriever:
         results = self.collection.query(
             query_embeddings=[query_vec],
             n_results=self.top_k * 3,
-            include=["metadatas", "distances", "ids"]
+            include=["metadatas", "distances"]
         )
 
         sem_nodes = []

@@ -24,12 +24,14 @@ class CodeDataPipeline:
     # Source 1: Raw Python code
     # ------------------------------------------------------------------
     def collect_raw_code(self, directory: str) -> List[str]:
-        """Collect raw Python source files."""
+        """Collect raw source files of all supported languages."""
+        from parser.language_parsers import SUPPORTED_EXTENSIONS
         texts = []
         for root, dirs, files in os.walk(directory):
             dirs[:] = [d for d in dirs if not d.startswith(".") and d != "__pycache__"]
             for f in files:
-                if f.endswith(".py"):
+                _, ext = os.path.splitext(f)
+                if ext.lower() in SUPPORTED_EXTENSIONS or ext.lower() == ".py":
                     path = os.path.join(root, f)
                     try:
                         with open(path, "r", encoding="utf-8", errors="ignore") as fp:
@@ -69,7 +71,7 @@ class CodeDataPipeline:
                 lines.append(f"[FUNC] {func_name}({args}){call_str}")
 
             for class_name, class_data in data.get("classes", {}).items():
-                bases = class_data.get("bases", [])
+                bases = class_data.get("inherits", [])
                 base_str = f" inherits: [{', '.join(bases)}]" if bases else ""
                 lines.append(f"[CLASS] {class_name}{base_str}")
 

@@ -61,20 +61,21 @@ class CodeTokenizer:
         print(f"Tokenizer trained: {tokenizer.get_vocab_size()} tokens, saved to {output_path}")
 
     def train_from_directory(self, directory: str, output_path: str):
-        """Train on all .py files in a directory tree."""
-        py_files = []
+        """Train on all supported source files in a directory tree."""
+        from parser.language_parsers import SUPPORTED_EXTENSIONS
+        code_files = []
         for root, dirs, files in os.walk(directory):
-            # Skip hidden dirs, __pycache__, .git
             dirs[:] = [d for d in dirs if not d.startswith(".") and d != "__pycache__"]
             for f in files:
-                if f.endswith(".py"):
-                    py_files.append(os.path.join(root, f))
+                _, ext = os.path.splitext(f)
+                if ext.lower() in SUPPORTED_EXTENSIONS or ext.lower() == ".py":
+                    code_files.append(os.path.join(root, f))
 
-        if not py_files:
-            raise ValueError(f"No .py files found in {directory}")
+        if not code_files:
+            raise ValueError(f"No source files found in {directory}")
 
-        print(f"Training tokenizer on {len(py_files)} Python files...")
-        self.train(py_files, output_path)
+        print(f"Training tokenizer on {len(code_files)} source files...")
+        self.train(code_files, output_path)
 
     def load(self, path: str):
         """Load a pre-trained tokenizer."""

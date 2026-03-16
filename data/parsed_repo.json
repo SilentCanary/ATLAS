@@ -1,1609 +1,1374 @@
 {
-  "repos\\ATLAS\\main.py": {
-    "file_path": "repos\\ATLAS\\main.py",
-    "functions": {},
-    "classes": {},
+  "repos\\BlitzOS\\drivers\\keyboard.c": {
+    "file_path": "repos\\BlitzOS\\drivers\\keyboard.c",
+    "language": "c",
     "imports": [
-      "os",
-      "json",
-      "pickle",
-      "parser.repo_cloner",
-      "parser.repo_parser",
-      "graph.graph_builder",
-      "semantic.embeddings",
-      "semantic.retrieval",
-      "graph.graph_store",
-      "graph.memory_graph",
-      "context.repo_structure",
-      "context.clustering",
-      "context.local_context",
-      "context.summarizer",
-      "context.global_summary",
-      "utils.planner"
+      "keyboard.h",
+      "../kernel/arch/x86_64/interrupts.h"
     ],
-    "folder": ".",
-    "module": "main"
-  },
-  "repos\\ATLAS\\main2.py": {
-    "file_path": "repos\\ATLAS\\main2.py",
     "functions": {
-      "initialize_repo": {
+      "kb_buffer_add": {
         "args": [
-          "repo_url"
+          "c"
         ],
-        "calls": [
-          "print",
-          "RepoCloner",
-          "cloner.clone_repo",
-          "print",
-          "CodeParser",
-          "parser.parse_repository",
-          "os.makedirs",
-          "os.path.join",
-          "open",
-          "json.dump",
-          "print",
-          "print",
-          "CodeGraphBuilder",
-          "builder.build_graph",
-          "print",
-          "repo_graph.number_of_nodes",
-          "print",
-          "repo_graph.number_of_edges",
-          "open",
-          "pickle.dump",
-          "print",
-          "print",
-          "build_semantic_memmory",
-          "print",
-          "len",
-          "collection.get",
-          "print",
-          "os.path.exists",
-          "open",
-          "MemoryGraph.from_json",
-          "f.read",
-          "print",
-          "MemoryGraph",
-          "print",
-          "repo_graph.nodes",
-          "memory.add_node",
-          "get",
-          "repo_graph.edges",
-          "memory.add_edge",
-          "data.get",
-          "data.get",
-          "GraphStore",
-          "CodeRetriever",
-          "build_repo_structure",
-          "format_structure"
-        ],
-        "start_line": 19,
-        "end_line": 74,
-        "code": "def initialize_repo(repo_url):\n    print(\"Cloning repository...\")\n    cloner = RepoCloner()\n    repo_path = cloner.clone_repo(repo_url)\n\n    print(\"Parsing repository...\")\n    parser = CodeParser()\n    parsed = parser.parse_repository(repo_path)\n\n    os.makedirs(\"data\", exist_ok=True)\n    parsed_file = os.path.join(\"data\", \"parsed_repo.json\")\n    with open(parsed_file, \"w\", encoding=\"utf-8\") as f:\n        json.dump(parsed, f, indent=2)\n    print(f\"Parsed repo saved to {parsed_file}\")\n\n    print(\"Building repository graph...\")\n    builder = CodeGraphBuilder()\n    repo_graph = builder.build_graph(parsed)\n    print(\"Nodes:\", repo_graph.number_of_nodes())\n    print(\"Edges:\", repo_graph.number_of_edges())\n\n    graph_file = \"data/repo_graph.pkl\"\n    with open(graph_file, \"wb\") as f:\n        pickle.dump(repo_graph, f)\n    print(f\"Graph saved to {graph_file}\")\n\n    print(\"Building semantic memory...\")\n    collection = build_semantic_memmory(parsed)\n    print(f\"Collection info: {len(collection.get()['ids'])}\")\n\n    print(\"Loading or initializing Hebbian MemoryGraph...\")\n    if os.path.exists(MEMORY_FILE):\n        with open(MEMORY_FILE, \"r\", encoding=\"utf-8\") as f:\n            memory = MemoryGraph.from_json(f.read())\n        print(\"MemoryGraph loaded from previous session.\")\n    else:\n        memory = MemoryGraph()\n        print(\"Initialized new MemoryGraph.\")\n\n    # Add nodes and edges\n    for node in repo_graph.nodes():\n        memory.add_node(node, node_type=repo_graph.nodes[node].get(\"type\", \"concept\"))\n    for src, tgt, data in repo_graph.edges(data=True):\n        memory.add_edge(\n            src, tgt,\n            weight=data.get(\"weight\", 0.1),\n            relation_type=data.get(\"relation\", \"related_to\")\n        )\n\n    graph_store = GraphStore(repo_graph)\n    retriever = CodeRetriever(collection=collection, graph_store=graph_store, top_k=5)\n\n    structure_dict = build_repo_structure(repo_path)\n    repo_structure = format_structure(structure_dict)\n\n    return parsed, repo_graph, memory, retriever, graph_store, repo_structure"
+        "calls": [],
+        "start_line": 67,
+        "end_line": 73,
+        "code": "static void kb_buffer_add(char c) {\n    uint16_t next_write = (kb_buffer_write + 1) % KB_BUFFER_SIZE;\n    if (next_write != kb_buffer_read) {\n        kb_buffer[kb_buffer_write] = c;\n        kb_buffer_write = next_write;\n    }\n}"
       },
-      "explore_repo": {
-        "args": [
-          "parsed",
-          "graph_store",
-          "retriever",
-          "repo_structure"
-        ],
+      "keyboard_init": {
+        "args": [],
         "calls": [
-          "input",
-          "retriever.retrieve",
-          "print",
-          "get",
-          "get",
-          "get",
-          "print",
-          "get",
-          "get",
-          "parsed.get",
-          "build_context_for_nodes",
-          "cluster_by_files",
-          "summarize_clusters",
-          "generate_global_summary",
-          "print",
-          "print",
-          "print",
-          "explain_repo",
-          "print"
+          "inb",
+          "inb"
         ],
         "start_line": 76,
-        "end_line": 100,
-        "code": "def explore_repo(parsed, graph_store, retriever, repo_structure):\n    query = input(\"What do you want to know about the repo? \")\n    results = retriever.retrieve(query)\n\n    print(\"\\nTop retrieved nodes:\")\n    for node, score in results[:10]:\n        node_type = graph_store.graph.nodes[node].get(\"type\")\n        folder = graph_store.graph.nodes[node].get(\"folder\")\n        module = graph_store.graph.nodes[node].get(\"module\")\n        print(f\"{node_type}: {node} (folder: {folder}, module: {module}, score: {score:.3f})\")\n\n    # Generate clusters & summaries\n    top_nodes = [node for node, _ in results[:5]]\n    snippets = {n: parsed.get(\"functions\", {}).get(n, {}).get(\"code\", \"\") for n in top_nodes}\n    contexts = build_context_for_nodes(graph_store, top_nodes)\n    clusters = cluster_by_files(top_nodes)\n    cluster_summaries = summarize_clusters(clusters, contexts, snippets)\n    global_summary = generate_global_summary(cluster_summaries, repo_structure)\n\n    print(\"\\n\ud83e\udde0 Cluster Summaries:\")\n    for c in cluster_summaries:\n        print(c['cluster'], \"->\", c['summary'])\n    print(\"\\n\ud83c\udf0d Global Summary:\\n\", global_summary)\n    answer = explain_repo(context, query)\n    print(\"\\n\ud83e\udde0 Answer:\\n\", answer)"
+        "end_line": 86,
+        "code": "void keyboard_init(void) {\n    // Clear buffer\n    kb_buffer_read = 0;\n    kb_buffer_write = 0;\n    \n    // Keyboard is already initialized by BIOS/GRUB\n    // Just clear any pending data\n    while (inb(KB_STATUS_PORT) & KB_STATUS_OUTPUT_FULL) {\n        inb(KB_DATA_PORT);\n    }\n}"
       },
-      "generate_code": {
-        "args": [
-          "context"
-        ],
+      "keyboard_handler": {
+        "args": [],
         "calls": [
-          "input",
-          "plan_code",
-          "print"
+          "inb",
+          "kb_buffer_add"
         ],
-        "start_line": 103,
-        "end_line": 106,
-        "code": "def generate_code(context):\n    query = input(\"Enter the new feature or code you want to add: \")\n    new_code = plan_code(context, query)\n    print(\"\\nGenerated Code:\\n\", new_code)"
-      }
-    },
-    "classes": {},
-    "imports": [
-      "os",
-      "json",
-      "pickle",
-      "parser.repo_cloner",
-      "parser.repo_parser",
-      "graph.graph_builder",
-      "semantic.embeddings",
-      "semantic.retrieval",
-      "graph.graph_store",
-      "graph.memory_graph",
-      "context.repo_structure",
-      "context.clustering",
-      "context.local_context",
-      "context.summarizer",
-      "context.global_summary",
-      "utils.planner"
-    ],
-    "folder": ".",
-    "module": "main2"
-  },
-  "repos\\ATLAS\\context\\clustering.py": {
-    "file_path": "repos\\ATLAS\\context\\clustering.py",
-    "functions": {
-      "cluster_by_files": {
-        "args": [
-          "nodes"
-        ],
-        "calls": [
-          "defaultdict",
-          "node.split",
-          "append",
-          "list",
-          "clusters.values"
-        ],
-        "start_line": 3,
-        "end_line": 9,
-        "code": "def cluster_by_files(nodes):\n    clusters=defaultdict(list)\n    for node in nodes:\n        file_path=node.split(\"::\")[0]\n        clusters[file_path].append(node)\n    \n    return list(clusters.values())"
+        "start_line": 89,
+        "end_line": 133,
+        "code": "void keyboard_handler(void) {\n    uint8_t scancode = inb(KB_DATA_PORT);\n    \n    // Check if key release (bit 7 set)\n    if (scancode & 0x80) {\n        // Key released\n        scancode &= 0x7F;\n        \n        // Update modifier keys\n        if (scancode == KEY_LSHIFT || scancode == KEY_RSHIFT) {\n            shift_pressed = 0;\n        } else if (scancode == KEY_LCTRL) {\n            ctrl_pressed = 0;\n        } else if (scancode == KEY_LALT) {\n            alt_pressed = 0;\n        }\n    } else {\n        // Key pressed\n        \n        // Update modifier keys\n        if (scancode == KEY_LSHIFT || scancode == KEY_RSHIFT) {\n            shift_pressed = 1;\n            return;\n        } else if (scancode == KEY_LCTRL) {\n            ctrl_pressed = 1;\n            return;\n        } else if (scancode == KEY_LALT) {\n            alt_pressed = 1;\n            return;\n        }\n        \n        // Convert scancode to ASCII\n        char c = 0;\n        if (shift_pressed) {\n            c = keyboard_us_shifted[scancode];\n        } else {\n            c = keyboard_us[scancode];\n        }\n        \n        // Add to buffer if valid character\n        if (c != 0) {\n            kb_buffer_add(c);\n        }\n    }\n}"
       },
-      "cluster_scc": {
-        "args": [
-          "graph",
-          "nodes"
-        ],
-        "calls": [
-          "set",
-          "visited.add",
-          "current_cluster.append",
-          "graph.get_neighbors",
-          "dfs",
-          "dfs",
-          "clusters.append"
-        ],
-        "start_line": 11,
-        "end_line": 29,
-        "code": "def cluster_scc(graph, nodes):\n    visited = set()\n    clusters = []\n\n    def dfs(node, current_cluster):\n        visited.add(node)\n        current_cluster.append(node)\n\n        for nei in graph.get_neighbors(node):\n            if nei not in visited:\n                dfs(nei, current_cluster)\n\n    for node in nodes:\n        if node not in visited:\n            cluster = []\n            dfs(node, cluster)\n            clusters.append(cluster)\n\n    return clusters"
-      }
-    },
-    "classes": {},
-    "imports": [
-      "collections"
-    ],
-    "folder": "context",
-    "module": "clustering"
-  },
-  "repos\\ATLAS\\context\\final_context.py": {
-    "file_path": "repos\\ATLAS\\context\\final_context.py",
-    "functions": {
-      "build_final_context": {
-        "args": [
-          "global_summary",
-          "cluster_summaries",
-          "structure",
-          "snippets"
-        ],
+      "keyboard_has_input": {
+        "args": [],
         "calls": [],
-        "start_line": 1,
-        "end_line": 7,
-        "code": "def build_final_context(global_summary, cluster_summaries, structure, snippets):\n    return {\n        \"repo_summary\": global_summary,\n        \"module_summaries\": cluster_summaries,\n        \"repo_structure\": structure,\n        \"retrieved_code\": snippets\n    }"
+        "start_line": 136,
+        "end_line": 138,
+        "code": "int keyboard_has_input(void) {\n    return kb_buffer_read != kb_buffer_write;\n}"
+      },
+      "keyboard_getchar": {
+        "args": [],
+        "calls": [
+          "keyboard_has_input"
+        ],
+        "start_line": 141,
+        "end_line": 151,
+        "code": "char keyboard_getchar(void) {\n    // Wait for input\n    while (!keyboard_has_input()) {\n        __asm__ volatile(\"hlt\");\n    }\n    \n    // Read from buffer\n    char c = kb_buffer[kb_buffer_read];\n    kb_buffer_read = (kb_buffer_read + 1) % KB_BUFFER_SIZE;\n    return c;\n}"
       }
     },
     "classes": {},
+    "folder": "drivers",
+    "module": "keyboard"
+  },
+  "repos\\BlitzOS\\drivers\\keyboard.h": {
+    "file_path": "repos\\BlitzOS\\drivers\\keyboard.h",
+    "language": "c",
     "imports": [],
-    "folder": "context",
-    "module": "final_context"
-  },
-  "repos\\ATLAS\\context\\global_summary.py": {
-    "file_path": "repos\\ATLAS\\context\\global_summary.py",
-    "functions": {
-      "build_global_prompt": {
-        "args": [
-          "cluster_summaries",
-          "repo_structure"
-        ],
-        "calls": [
-          "str"
-        ],
-        "start_line": 2,
-        "end_line": 14,
-        "code": "def build_global_prompt(cluster_summaries, repo_structure):\n    prompt = \"You are given a codebase summary.\\n\\n\"\n\n    prompt += \"Repository Structure:\\n\"\n    prompt += str(repo_structure) + \"\\n\\n\"\n\n    prompt += \"Module Summaries:\\n\"\n    for c in cluster_summaries:\n        prompt += f\"- {c['summary']}\\n\"\n\n    prompt += \"\\nExplain what this project does and how it is organized.\"\n\n    return prompt"
-      },
-      "generate_global_summary": {
-        "args": [
-          "cluster_summaries",
-          "structure"
-        ],
-        "calls": [
-          "build_global_prompt",
-          "ask_llm"
-        ],
-        "start_line": 16,
-        "end_line": 18,
-        "code": "def generate_global_summary(cluster_summaries, structure):\n    prompt = build_global_prompt(cluster_summaries, structure)\n    return ask_llm(prompt)"
-      }
-    },
+    "functions": {},
     "classes": {},
-    "imports": [
-      "llm_call"
-    ],
-    "folder": "context",
-    "module": "global_summary"
+    "folder": "drivers",
+    "module": "keyboard"
   },
-  "repos\\ATLAS\\context\\llm_call.py": {
-    "file_path": "repos\\ATLAS\\context\\llm_call.py",
-    "functions": {
-      "ask_llm": {
-        "args": [
-          "prompt",
-          "max_tokens",
-          "temperature"
-        ],
-        "calls": [
-          "bedrock_client.invoke_model",
-          "BytesIO",
-          "encode",
-          "json.dumps",
-          "read",
-          "raw_body.decode",
-          "print",
-          "json.loads",
-          "get",
-          "str"
-        ],
-        "start_line": 22,
-        "end_line": 56,
-        "code": "def ask_llm(prompt: str, max_tokens: int = 512, temperature: float = 0.5) -> str:\n    import json, boto3\n    from io import BytesIO\n\n    payload = {\n        \"anthropic_version\": \"bedrock-2023-05-31\",\n        \"max_tokens\": max_tokens,\n        \"temperature\": temperature,\n        \"messages\": [{\"role\": \"user\", \"content\": prompt}]\n    }\n\n    response = bedrock_client.invoke_model(\n        modelId=LLM_MODEL,\n        body=BytesIO(json.dumps(payload).encode(\"utf-8\")),\n        contentType=\"application/json\",\n        accept=\"application/json\"\n    )\n\n    raw_body = response[\"body\"].read()\n    raw_text = raw_body.decode()\n    print(\"\\n--- RAW RESPONSE ---\\n\", raw_text, \"\\n--- END RAW RESPONSE ---\\n\")\n\n    try:\n        result = json.loads(raw_text)\n        # Check multiple structures\n        if \"choices\" in result:\n            return result[\"choices\"][0][\"message\"][\"content\"]\n        elif \"content\" in result:\n            return result[\"content\"][0].get(\"text\", \"\")\n        elif \"completion\" in result:\n            return result[\"completion\"]\n        else:\n            return str(result)\n    except json.JSONDecodeError:\n        return raw_text"
-      }
-    },
-    "classes": {},
+  "repos\\BlitzOS\\drivers\\pit.c": {
+    "file_path": "repos\\BlitzOS\\drivers\\pit.c",
+    "language": "c",
     "imports": [
-      "json",
-      "boto3",
-      "io",
-      "typing"
+      "pit.h",
+      "../kernel/arch/x86_64/interrupts.h"
     ],
-    "folder": "context",
-    "module": "llm_call"
-  },
-  "repos\\ATLAS\\context\\local_context.py": {
-    "file_path": "repos\\ATLAS\\context\\local_context.py",
     "functions": {
-      "get_local_context": {
-        "args": [
-          "graph",
-          "node",
-          "types"
-        ],
-        "calls": [
-          "graph.get_full_upstream",
-          "graph.get_full_downstream"
-        ],
-        "start_line": 1,
-        "end_line": 6,
-        "code": "def get_local_context(graph,node,types=None):\n    return{\n        \"node\":node,\n        \"upstream\":graph.get_full_upstream(node,types=types),\n        \"downstream\":graph.get_full_downstream(node,types=types)\n    }"
-      },
-      "build_context_for_nodes": {
-        "args": [
-          "graph",
-          "nodes",
-          "types"
-        ],
-        "calls": [
-          "get_local_context",
-          "contexts.append"
-        ],
+      "pit_handler": {
+        "args": [],
+        "calls": [],
         "start_line": 8,
-        "end_line": 14,
-        "code": "def build_context_for_nodes(graph,nodes,types=None):\n    contexts=[]\n    for node in nodes:\n        ctx=get_local_context(graph,node,types=types)\n        contexts.append(ctx)\n\n    return contexts"
-      }
-    },
-    "classes": {},
-    "imports": [],
-    "folder": "context",
-    "module": "local_context"
-  },
-  "repos\\ATLAS\\context\\repo_structure.py": {
-    "file_path": "repos\\ATLAS\\context\\repo_structure.py",
-    "functions": {
-      "build_repo_structure": {
-        "args": [
-          "repo_path"
-        ],
-        "calls": [
-          "os.walk",
-          "os.path.relpath"
-        ],
-        "start_line": 3,
-        "end_line": 14,
-        "code": "def build_repo_structure(repo_path):\n    structure = {}\n\n    for root, dirs, files in os.walk(repo_path):\n        rel_path = os.path.relpath(root, repo_path)\n\n        structure[rel_path] = {\n            \"folders\": dirs,\n            \"files\": files\n        }\n\n    return structure"
+        "end_line": 11,
+        "code": "void pit_handler(void) {\n    timer_ticks++;\n    // Note: Preemption now handled in preempt_handler() called from assembly\n}"
       },
-      "format_structure": {
-        "args": [
-          "structure"
-        ],
+      "pit_init": {
+        "args": [],
         "calls": [
-          "structure.items"
+          "outb",
+          "outb",
+          "outb"
         ],
-        "start_line": 16,
+        "start_line": 14,
         "end_line": 25,
-        "code": "def format_structure(structure):\n    text = \"\"\n\n    for path, content in structure.items():\n        text += f\"\\n\ud83d\udcc1 {path}\\n\"\n\n        for f in content[\"files\"]:\n            text += f\"  - {f}\\n\"\n\n    return text"
-      }
-    },
-    "classes": {},
-    "imports": [
-      "os"
-    ],
-    "folder": "context",
-    "module": "repo_structure"
-  },
-  "repos\\ATLAS\\context\\summarizer.py": {
-    "file_path": "repos\\ATLAS\\context\\summarizer.py",
-    "functions": {
-      "build_cluster_prompt": {
+        "code": "void pit_init(void) {\n    // Calculate divisor for desired frequency\n    uint32_t divisor = PIT_FREQUENCY / TIMER_FREQUENCY;\n    \n    // Send command byte: Channel 0, Mode 3 (square wave), binary mode\n    // Command format: 00 (Channel 0) 11 (lobyte/hibyte) 011 (square wave) 0 (binary)\n    outb(PIT_COMMAND, 0x36);\n    \n    // Send frequency divisor (low byte, then high byte)\n    outb(PIT_CHANNEL0, divisor & 0xFF);\n    outb(PIT_CHANNEL0, (divisor >> 8) & 0xFF);\n}"
+      },
+      "pit_get_ticks": {
+        "args": [],
+        "calls": [],
+        "start_line": 28,
+        "end_line": 30,
+        "code": "uint64_t pit_get_ticks(void) {\n    return timer_ticks;\n}"
+      },
+      "pit_sleep": {
         "args": [
-          "cluster",
-          "contexts",
-          "snippets"
+          "ticks"
         ],
         "calls": [],
-        "start_line": 2,
-        "end_line": 23,
-        "code": "def build_cluster_prompt(cluster, contexts, snippets):\n    text = \"You are analyzing a codebase.\\n\\n\"\n\n    text += \"Functions in this group:\\n\"\n    for node in cluster:\n        text += f\"- {node}\\n\"\n\n    text += \"\\nContext:\\n\"\n    for ctx in contexts:\n        if ctx[\"node\"] in cluster:\n            text += f\"\\nNode: {ctx['node']}\\n\"\n            text += f\"Upstream: {ctx['upstream']}\\n\"\n            text += f\"Downstream: {ctx['downstream']}\\n\"\n\n    text += \"\\nCode Snippets:\\n\"\n    for node in cluster:\n        if node in snippets:\n            text += f\"\\n{snippets[node]}\\n\"\n\n    text += \"\\nSummarize what this group of functions does in 1-2 lines.\"\n\n    return text"
-      },
-      "summarize_clusters": {
-        "args": [
-          "clusters",
-          "contexts",
-          "snippets"
-        ],
-        "calls": [
-          "build_cluster_prompt",
-          "ask_llm",
-          "summaries.append"
-        ],
-        "start_line": 25,
-        "end_line": 37,
-        "code": "def summarize_clusters(clusters, contexts, snippets):\n    summaries = []\n\n    for cluster in clusters:\n        prompt = build_cluster_prompt(cluster, contexts, snippets)\n        summary = ask_llm(prompt)\n\n        summaries.append({\n            \"cluster\": cluster,\n            \"summary\": summary\n        })\n\n    return summaries"
+        "start_line": 33,
+        "end_line": 38,
+        "code": "void pit_sleep(uint64_t ticks) {\n    uint64_t end_tick = timer_ticks + ticks;\n    while (timer_ticks < end_tick) {\n        __asm__ volatile(\"hlt\");  // Halt CPU until next interrupt\n    }\n}"
       }
     },
     "classes": {},
-    "imports": [
-      "llm_call"
-    ],
-    "folder": "context",
-    "module": "summarizer"
+    "folder": "drivers",
+    "module": "pit"
   },
-  "repos\\ATLAS\\context\\__init__.py": {
-    "file_path": "repos\\ATLAS\\context\\__init__.py",
+  "repos\\BlitzOS\\drivers\\pit.h": {
+    "file_path": "repos\\BlitzOS\\drivers\\pit.h",
+    "language": "c",
+    "imports": [],
     "functions": {},
     "classes": {},
-    "imports": [],
-    "folder": "context",
-    "module": "__init__"
+    "folder": "drivers",
+    "module": "pit"
   },
-  "repos\\ATLAS\\graph\\graph_builder.py": {
-    "file_path": "repos\\ATLAS\\graph\\graph_builder.py",
-    "functions": {},
-    "classes": {
-      "CodeGraphBuilder": {
-        "inherits": [],
-        "methods": {
-          "__init__": {
-            "args": [
-              "self"
-            ],
-            "calls": [
-              "nx.DiGraph"
-            ],
-            "start_line": 5,
-            "end_line": 6,
-            "code": "def __init__(self):\n        self.graph=nx.DiGraph()"
-          },
-          "build_graph": {
-            "args": [
-              "self",
-              "parsed_repo"
-            ],
-            "calls": [
-              "parsed_repo.items",
-              "data.get",
-              "items",
-              "data.get",
-              "cls_data.get",
-              "parsed_repo.items",
-              "self.graph.add_node",
-              "data.get",
-              "self.graph.add_node",
-              "self.graph.add_edge",
-              "items",
-              "data.get",
-              "self.graph.add_node",
-              "self.graph.add_edge",
-              "items",
-              "data.get",
-              "self.graph.add_node",
-              "self.graph.add_edge",
-              "cls_data.get",
-              "self.graph.add_node",
-              "self.graph.add_edge",
-              "items",
-              "cls_data.get",
-              "self.graph.add_node",
-              "self.graph.add_edge",
-              "parsed_repo.items",
-              "items",
-              "data.get",
-              "func_data.get",
-              "function_lookup.get",
-              "self.graph.add_edge",
-              "self.graph.add_node",
-              "self.graph.add_edge",
-              "items",
-              "data.get",
-              "items",
-              "cls_data.get",
-              "method_data.get",
-              "method_lookup.get",
-              "function_lookup.get",
-              "self.graph.add_edge",
-              "self.graph.add_node",
-              "self.graph.add_edge"
-            ],
-            "start_line": 8,
-            "end_line": 108,
-            "code": "def build_graph(self,parsed_repo):\n\n        function_lookup={}\n        method_lookup={}\n\n        for file_path, data in parsed_repo.items():\n\n            for func_name in data.get(\"functions\",{}):\n                node=f\"{file_path}::{func_name}\"\n                function_lookup[func_name]=node \n\n            for cls_name,cls_data in data.get(\"classes\",{}).items():\n                for method_name in cls_data.get(\"methods\",{}):\n                    key=f\"{cls_name}.{method_name}\"\n                    node=f\"{file_path}::{cls_name}::{method_name}\"\n                    method_lookup[key]=node\n            \n        for file_path, data in parsed_repo.items():\n            self.graph.add_node(file_path,type=\"file\")\n\n\n            for imp in data.get(\"imports\",[]):\n                self.graph.add_node(imp,type=\"module\")\n                self.graph.add_edge(file_path,imp,relation=\"imports\")\n\n\n            for func_name, func_data in data.get(\"functions\",{}).items():\n                func_node=f\"{file_path}::{func_name}\"\n                self.graph.add_node(\n                    func_node,\n                    type=\"function\",\n                    code=func_data[\"code\"],\n                    args=func_data[\"args\"],\n                    start_line=func_data[\"start_line\"],\n                    end_line=func_data[\"end_line\"]\n                )\n                self.graph.add_edge(file_path,func_node,relation=\"defines\")\n\n\n            for cls_name, cls_data in data.get(\"classes\", {}).items():\n\n                cls_node = f\"{file_path}::{cls_name}\"\n\n                self.graph.add_node(cls_node, type=\"class\")\n                self.graph.add_edge(file_path, cls_node, relation=\"defines\")\n\n                # Inheritance\n                for parent in cls_data.get(\"inherits\", []):\n                    self.graph.add_node(parent, type=\"class\")\n                    self.graph.add_edge(cls_node, parent, relation=\"inherits\")\n\n                # Methods\n                for method_name, method_data in cls_data.get(\"methods\", {}).items():\n\n                    method_node = f\"{file_path}::{cls_name}::{method_name}\"\n\n                    self.graph.add_node(\n                        method_node,\n                        type=\"method\",\n                        code=method_data[\"code\"],\n                        args=method_data[\"args\"],\n                        start_line=method_data[\"start_line\"],\n                        end_line=method_data[\"end_line\"]\n                    )\n\n                    self.graph.add_edge(cls_node, method_node, relation=\"defines\")\n\n\n        for file_path,data in parsed_repo.items():\n\n            for func_name,func_data in data.get(\"functions\",{}).items():\n                func_node = f\"{file_path}::{func_name}\"\n\n                for call in func_data.get(\"calls\", []):\n\n                    target = function_lookup.get(call)\n\n                    if target:\n                        self.graph.add_edge(func_node, target, relation=\"calls\")\n                    else:\n                        self.graph.add_node(call, type=\"external_function\")\n                        self.graph.add_edge(func_node, call, relation=\"calls\")\n\n            for cls_name, cls_data in data.get(\"classes\", {}).items():\n\n                for method_name, method_data in cls_data.get(\"methods\", {}).items():\n\n                    method_node = f\"{file_path}::{cls_name}::{method_name}\"\n\n                    for call in method_data.get(\"calls\", []):\n\n                        key = f\"{cls_name}.{call}\"\n                        target = method_lookup.get(key) or function_lookup.get(call)\n\n                        if target:\n                            self.graph.add_edge(method_node, target, relation=\"calls\")\n                        else:\n                            self.graph.add_node(call, type=\"external_function\")\n                            self.graph.add_edge(method_node, call, relation=\"calls\")\n\n        return self.graph"
-          }
-        }
-      }
-    },
+  "repos\\BlitzOS\\drivers\\vga.c": {
+    "file_path": "repos\\BlitzOS\\drivers\\vga.c",
+    "language": "c",
     "imports": [
-      "networkx"
+      "vga.h"
     ],
-    "folder": "graph",
-    "module": "graph_builder"
-  },
-  "repos\\ATLAS\\graph\\graph_store.py": {
-    "file_path": "repos\\ATLAS\\graph\\graph_store.py",
-    "functions": {},
-    "classes": {
-      "GraphStore": {
-        "inherits": [],
-        "methods": {
-          "__init__": {
-            "args": [
-              "self",
-              "graph"
-            ],
-            "calls": [],
-            "start_line": 2,
-            "end_line": 3,
-            "code": "def __init__(self, graph):\n        self.graph = graph"
-          },
-          "get_downstream_impact": {
-            "args": [
-              "self",
-              "node",
-              "types"
-            ],
-            "calls": [
-              "list",
-              "self.graph.successors",
-              "get"
-            ],
-            "start_line": 6,
-            "end_line": 14,
-            "code": "def get_downstream_impact(self, node, types=None):\n     \n        if node not in self.graph:\n            return []\n\n        neighbors = list(self.graph.successors(node))\n        if types:\n            neighbors = [n for n in neighbors if self.graph.nodes[n].get(\"type\") in types]\n        return neighbors"
-          },
-          "get_upstream_dependencies": {
-            "args": [
-              "self",
-              "node",
-              "types"
-            ],
-            "calls": [
-              "list",
-              "self.graph.predecessors",
-              "get"
-            ],
-            "start_line": 17,
-            "end_line": 24,
-            "code": "def get_upstream_dependencies(self, node, types=None):\n        if node not in self.graph:\n            return []\n\n        neighbors = list(self.graph.predecessors(node))\n        if types:\n            neighbors = [n for n in neighbors if self.graph.nodes[n].get(\"type\") in types]\n        return neighbors"
-          },
-          "get_full_downstream": {
-            "args": [
-              "self",
-              "node",
-              "types"
-            ],
-            "calls": [
-              "set",
-              "queue.pop",
-              "self.graph.successors",
-              "visited.add",
-              "queue.append",
-              "get",
-              "list"
-            ],
-            "start_line": 27,
-            "end_line": 43,
-            "code": "def get_full_downstream(self, node, types=None):\n        if node not in self.graph:\n            return []\n\n        visited = set()\n        queue = [node]\n\n        while queue:\n            current = queue.pop(0)\n            for neighbor in self.graph.successors(current):\n                if neighbor not in visited:\n                    visited.add(neighbor)\n                    queue.append(neighbor)\n\n        if types:\n            return [n for n in visited if self.graph.nodes[n].get(\"type\") in types]\n        return list(visited)"
-          },
-          "get_full_upstream": {
-            "args": [
-              "self",
-              "node",
-              "types"
-            ],
-            "calls": [
-              "set",
-              "queue.pop",
-              "self.graph.predecessors",
-              "visited.add",
-              "queue.append",
-              "get",
-              "list"
-            ],
-            "start_line": 46,
-            "end_line": 62,
-            "code": "def get_full_upstream(self, node, types=None):\n        if node not in self.graph:\n            return []\n\n        visited = set()\n        queue = [node]\n\n        while queue:\n            current = queue.pop(0)\n            for neighbor in self.graph.predecessors(current):\n                if neighbor not in visited:\n                    visited.add(neighbor)\n                    queue.append(neighbor)\n\n        if types:\n            return [n for n in visited if self.graph.nodes[n].get(\"type\") in types]\n        return list(visited)"
-          },
-          "get_function_downstream": {
-            "args": [
-              "self",
-              "node"
-            ],
-            "calls": [
-              "self.get_full_downstream"
-            ],
-            "start_line": 65,
-            "end_line": 66,
-            "code": "def get_function_downstream(self, node):\n        return self.get_full_downstream(node, types=[\"function\"])"
-          },
-          "get_method_downstream": {
-            "args": [
-              "self",
-              "node"
-            ],
-            "calls": [
-              "self.get_full_downstream"
-            ],
-            "start_line": 69,
-            "end_line": 70,
-            "code": "def get_method_downstream(self, node):\n        return self.get_full_downstream(node, types=[\"method\"])"
-          },
-          "get_folder_downstream": {
-            "args": [
-              "self",
-              "node"
-            ],
-            "calls": [
-              "self.get_full_downstream"
-            ],
-            "start_line": 73,
-            "end_line": 74,
-            "code": "def get_folder_downstream(self, node):\n        return self.get_full_downstream(node, types=[\"folder\"])"
-          },
-          "get_module_downstream": {
-            "args": [
-              "self",
-              "node"
-            ],
-            "calls": [
-              "self.get_full_downstream"
-            ],
-            "start_line": 77,
-            "end_line": 78,
-            "code": "def get_module_downstream(self, node):\n        return self.get_full_downstream(node, types=[\"module\"])"
-          }
-        }
-      }
-    },
-    "imports": [],
-    "folder": "graph",
-    "module": "graph_store"
-  },
-  "repos\\ATLAS\\graph\\memory_graph.py": {
-    "file_path": "repos\\ATLAS\\graph\\memory_graph.py",
-    "functions": {},
-    "classes": {
-      "NodeData": {
-        "inherits": [],
-        "methods": {
-          "to_dict": {
-            "args": [
-              "self"
-            ],
-            "calls": [],
-            "start_line": 19,
-            "end_line": 27,
-            "code": "def to_dict(self) -> dict:\n        return {\n            \"activation\": self.activation,\n            \"confidence\": self.confidence,\n            \"created_at\": self.created_at,\n            \"updated_at\": self.updated_at,\n            \"node_type\": self.node_type,\n            \"metadata\": self.metadata\n        }"
-          },
-          "from_dict": {
-            "args": [
-              "cls",
-              "data"
-            ],
-            "calls": [
-              "cls",
-              "data.get",
-              "data.get",
-              "data.get",
-              "isoformat",
-              "datetime.now",
-              "data.get",
-              "isoformat",
-              "datetime.now",
-              "data.get",
-              "data.get"
-            ],
-            "start_line": 30,
-            "end_line": 38,
-            "code": "def from_dict(cls, data: dict) -> \"NodeData\":\n        return cls(\n            activation=data.get(\"activation\", 1.0),\n            confidence=data.get(\"confidence\", 1.0),\n            created_at=data.get(\"created_at\", datetime.now().isoformat()),\n            updated_at=data.get(\"updated_at\", datetime.now().isoformat()),\n            node_type=data.get(\"node_type\", \"concept\"),\n            metadata=data.get(\"metadata\", {})\n        )"
-          }
-        }
-      },
-      "EdgeData": {
-        "inherits": [],
-        "methods": {
-          "to_dict": {
-            "args": [
-              "self"
-            ],
-            "calls": [],
-            "start_line": 50,
-            "end_line": 57,
-            "code": "def to_dict(self) -> dict:\n        return {\n            \"weight\": self.weight,\n            \"relation_type\": self.relation_type,\n            \"created_at\": self.created_at,\n            \"updated_at\": self.updated_at,\n            \"co_activation_count\": self.co_activation_count\n        }"
-          },
-          "from_dict": {
-            "args": [
-              "cls",
-              "data"
-            ],
-            "calls": [
-              "cls",
-              "data.get",
-              "data.get",
-              "data.get",
-              "isoformat",
-              "datetime.now",
-              "data.get",
-              "isoformat",
-              "datetime.now",
-              "data.get"
-            ],
-            "start_line": 60,
-            "end_line": 67,
-            "code": "def from_dict(cls, data: dict) -> \"EdgeData\":\n        return cls(\n            weight=data.get(\"weight\", 0.1),\n            relation_type=data.get(\"relation_type\", \"related_to\"),\n            created_at=data.get(\"created_at\", datetime.now().isoformat()),\n            updated_at=data.get(\"updated_at\", datetime.now().isoformat()),\n            co_activation_count=data.get(\"co_activation_count\", 1)\n        )"
-          }
-        }
-      },
-      "MemoryGraph": {
-        "inherits": [],
-        "methods": {
-          "__init__": {
-            "args": [
-              "self",
-              "learning_rate",
-              "decay_rate",
-              "activation_threshold",
-              "max_nodes",
-              "max_edges",
-              "prune_threshold"
-            ],
-            "calls": [
-              "nx.DiGraph"
-            ],
-            "start_line": 72,
-            "end_line": 95,
-            "code": "def __init__(\n        self,\n        learning_rate: float = 0.05,\n        decay_rate: float = 0.01,\n        activation_threshold: float = 0.3,\n        max_nodes: int = 1000,\n        max_edges: int = 5000,\n        prune_threshold: float = 0.01\n    ):\n        self.graph = nx.DiGraph()\n        self.learning_rate = learning_rate\n        self.decay_rate = decay_rate\n        self.activation_threshold = activation_threshold\n        self.max_nodes = max_nodes\n        self.max_edges = max_edges\n        self.prune_threshold = prune_threshold\n        \n        # Statistics\n        self.stats = {\n            \"total_updates\": 0,\n            \"nodes_added\": 0,\n            \"edges_added\": 0,\n            \"edges_pruned\": 0\n        }"
-          },
-          "node_count": {
-            "args": [
-              "self"
-            ],
-            "calls": [
-              "self.graph.number_of_nodes"
-            ],
-            "start_line": 98,
-            "end_line": 100,
-            "code": "def node_count(self) -> int:\n        \"\"\"Get number of nodes in graph.\"\"\"\n        return self.graph.number_of_nodes()"
-          },
-          "edge_count": {
-            "args": [
-              "self"
-            ],
-            "calls": [
-              "self.graph.number_of_edges"
-            ],
-            "start_line": 103,
-            "end_line": 105,
-            "code": "def edge_count(self) -> int:\n        \"\"\"Get number of edges in graph.\"\"\"\n        return self.graph.number_of_edges()"
-          },
-          "add_node": {
-            "args": [
-              "self",
-              "node_id",
-              "activation",
-              "node_type",
-              "confidence",
-              "metadata"
-            ],
-            "calls": [
-              "self.graph.has_node",
-              "self._update_node_activation",
-              "self._prune_least_important_nodes",
-              "NodeData",
-              "self.graph.add_node",
-              "node_data.to_dict"
-            ],
-            "start_line": 107,
-            "end_line": 145,
-            "code": "def add_node(\n        self,\n        node_id: str,\n        activation: float = 1.0,\n        node_type: str = \"concept\",\n        confidence: float = 1.0,\n        metadata: Optional[Dict[str, Any]] = None\n    ) -> bool:\n        \"\"\"\n        Add a node to the graph.\n        \n        Args:\n            node_id: Unique identifier for the node\n            activation: Initial activation level\n            node_type: Type of node (concept, code, task, etc.)\n            confidence: Confidence score for this node\n            metadata: Additional metadata\n            \n        Returns:\n            True if node was added, False if it already exists or limit reached\n        \"\"\"\n        if self.graph.has_node(node_id):\n            # Update existing node\n            self._update_node_activation(node_id, activation)\n            return False\n        \n        if self.node_count >= self.max_nodes:\n            self._prune_least_important_nodes()\n        \n        node_data = NodeData(\n            activation=activation,\n            confidence=confidence,\n            node_type=node_type,\n            metadata=metadata or {}\n        )\n        \n        self.graph.add_node(node_id, **node_data.to_dict())\n        self.stats[\"nodes_added\"] += 1\n        return True"
-          },
-          "add_edge": {
-            "args": [
-              "self",
-              "source",
-              "target",
-              "weight",
-              "relation_type"
-            ],
-            "calls": [
-              "self.graph.has_node",
-              "self.add_node",
-              "self.graph.has_node",
-              "self.add_node",
-              "self.graph.has_edge",
-              "self._hebbian_update",
-              "self._prune_weak_edges",
-              "EdgeData",
-              "self.graph.add_edge",
-              "edge_data.to_dict"
-            ],
-            "start_line": 147,
-            "end_line": 183,
-            "code": "def add_edge(\n        self,\n        source: str,\n        target: str,\n        weight: float = 0.1,\n        relation_type: str = \"related_to\"\n    ) -> bool:\n        \"\"\"\n        Add an edge (synapse) between nodes.\n        \n        Args:\n            source: Source node ID\n            target: Target node ID\n            weight: Initial connection weight\n            relation_type: Type of relation\n            \n        Returns:\n            True if edge was added/updated\n        \"\"\"\n        # Ensure nodes exist\n        if not self.graph.has_node(source):\n            self.add_node(source)\n        if not self.graph.has_node(target):\n            self.add_node(target)\n        \n        if self.graph.has_edge(source, target):\n            # Apply Hebbian update\n            self._hebbian_update(source, target, weight)\n            return False\n        \n        if self.edge_count >= self.max_edges:\n            self._prune_weak_edges()\n        \n        edge_data = EdgeData(weight=weight, relation_type=relation_type)\n        self.graph.add_edge(source, target, **edge_data.to_dict())\n        self.stats[\"edges_added\"] += 1\n        return True"
-          },
-          "_hebbian_update": {
-            "args": [
-              "self",
-              "source",
-              "target",
-              "delta"
-            ],
-            "calls": [
-              "get",
-              "get",
-              "get",
-              "min",
-              "isoformat",
-              "datetime.now",
-              "get"
-            ],
-            "start_line": 185,
-            "end_line": 214,
-            "code": "def _hebbian_update(self, source: str, target: str, delta: float = None):\n        \"\"\"\n        Apply Hebbian plasticity rule: \"Neurons that fire together wire together\"\n        \n        Update rule: weight += \u03b7 * activation_source * activation_target\n        \n        Args:\n            source: Source node ID\n            target: Target node ID\n            delta: Optional weight delta override\n        \"\"\"\n        source_activation = self.graph.nodes[source].get(\"activation\", 1.0)\n        target_activation = self.graph.nodes[target].get(\"activation\", 1.0)\n        \n        if source_activation < self.activation_threshold:\n            return\n        \n        # Calculate weight update\n        if delta is None:\n            delta = self.learning_rate * source_activation * target_activation\n        \n        current_weight = self.graph[source][target].get(\"weight\", 0.1)\n        new_weight = min(current_weight + delta, 1.0)  # Cap at 1.0\n        \n        self.graph[source][target][\"weight\"] = new_weight\n        self.graph[source][target][\"updated_at\"] = datetime.now().isoformat()\n        self.graph[source][target][\"co_activation_count\"] = \\\n            self.graph[source][target].get(\"co_activation_count\", 1) + 1\n        \n        self.stats[\"total_updates\"] += 1"
-          },
-          "_update_node_activation": {
-            "args": [
-              "self",
-              "node_id",
-              "new_activation"
-            ],
-            "calls": [
-              "get",
-              "isoformat",
-              "datetime.now"
-            ],
-            "start_line": 216,
-            "end_line": 222,
-            "code": "def _update_node_activation(self, node_id: str, new_activation: float):\n        \"\"\"Update a node's activation level with smoothing.\"\"\"\n        current = self.graph.nodes[node_id].get(\"activation\", 1.0)\n        # Exponential moving average\n        updated = 0.7 * current + 0.3 * new_activation\n        self.graph.nodes[node_id][\"activation\"] = updated\n        self.graph.nodes[node_id][\"updated_at\"] = datetime.now().isoformat()"
-          },
-          "decay_all": {
-            "args": [
-              "self"
-            ],
-            "calls": [
-              "self.graph.edges",
-              "get",
-              "edges_to_remove.append",
-              "self.graph.remove_edge"
-            ],
-            "start_line": 224,
-            "end_line": 239,
-            "code": "def decay_all(self):\n        \"\"\"Apply decay to all edges and prune weak ones.\"\"\"\n        edges_to_remove = []\n        \n        for source, target in self.graph.edges():\n            current_weight = self.graph[source][target].get(\"weight\", 0.1)\n            new_weight = current_weight * (1 - self.decay_rate)\n            \n            if new_weight < self.prune_threshold:\n                edges_to_remove.append((source, target))\n            else:\n                self.graph[source][target][\"weight\"] = new_weight\n        \n        for source, target in edges_to_remove:\n            self.graph.remove_edge(source, target)\n            self.stats[\"edges_pruned\"] += 1"
-          },
-          "_prune_weak_edges": {
-            "args": [
-              "self",
-              "count"
-            ],
-            "calls": [
-              "get",
-              "self.graph.edges",
-              "edges_with_weights.sort",
-              "self.graph.remove_edge"
-            ],
-            "start_line": 241,
-            "end_line": 251,
-            "code": "def _prune_weak_edges(self, count: int = 100):\n        \"\"\"Remove weakest edges to make room for new ones.\"\"\"\n        edges_with_weights = [\n            (s, t, self.graph[s][t].get(\"weight\", 0))\n            for s, t in self.graph.edges()\n        ]\n        edges_with_weights.sort(key=lambda x: x[2])\n        \n        for source, target, _ in edges_with_weights[:count]:\n            self.graph.remove_edge(source, target)\n            self.stats[\"edges_pruned\"] += 1"
-          },
-          "_prune_least_important_nodes": {
-            "args": [
-              "self",
-              "count"
-            ],
-            "calls": [
-              "nx.pagerank",
-              "sorted",
-              "pagerank.items",
-              "self.graph.remove_node",
-              "sorted",
-              "self.graph.nodes",
-              "get",
-              "self.graph.remove_node"
-            ],
-            "start_line": 253,
-            "end_line": 271,
-            "code": "def _prune_least_important_nodes(self, count: int = 50):\n        \"\"\"Remove least important nodes based on pagerank.\"\"\"\n        if self.node_count == 0:\n            return\n        \n        try:\n            pagerank = nx.pagerank(self.graph, alpha=0.85)\n            sorted_nodes = sorted(pagerank.items(), key=lambda x: x[1])\n            \n            for node_id, _ in sorted_nodes[:count]:\n                self.graph.remove_node(node_id)\n        except:\n            # Fallback: remove nodes with lowest activation\n            sorted_nodes = sorted(\n                self.graph.nodes(data=True),\n                key=lambda x: x[1].get(\"activation\", 0)\n            )\n            for node_id, _ in sorted_nodes[:count]:\n                self.graph.remove_node(node_id)"
-          },
-          "update_from_concepts": {
-            "args": [
-              "self",
-              "concepts",
-              "relations",
-              "context_node"
-            ],
-            "calls": [
-              "self.add_node",
-              "self.add_edge",
-              "enumerate",
-              "self.add_edge",
-              "self.add_edge",
-              "self.graph.has_node",
-              "self.add_node",
-              "self.add_edge"
-            ],
-            "start_line": 273,
-            "end_line": 307,
-            "code": "def update_from_concepts(\n        self,\n        concepts: List[str],\n        relations: Optional[List[Tuple[str, str, str]]] = None,\n        context_node: Optional[str] = None\n    ):\n        \"\"\"\n        Update graph from extracted concepts and relations.\n        \n        Args:\n            concepts: List of concept strings\n            relations: Optional list of (source, target, relation_type) tuples\n            context_node: Optional context node to link all concepts to\n        \"\"\"\n        # Add all concepts as nodes\n        for concept in concepts:\n            self.add_node(concept, node_type=\"concept\")\n        \n        # Add explicit relations\n        if relations:\n            for source, target, rel_type in relations:\n                self.add_edge(source, target, relation_type=rel_type)\n        \n        # Create implicit relations between co-occurring concepts\n        for i, concept1 in enumerate(concepts):\n            for concept2 in concepts[i+1:]:\n                self.add_edge(concept1, concept2, weight=0.05, relation_type=\"co_occurs\")\n                self.add_edge(concept2, concept1, weight=0.05, relation_type=\"co_occurs\")\n        \n        # Link to context if provided\n        if context_node:\n            if not self.graph.has_node(context_node):\n                self.add_node(context_node, node_type=\"task\")\n            for concept in concepts:\n                self.add_edge(context_node, concept, relation_type=\"context\")"
-          },
-          "get_related_nodes": {
-            "args": [
-              "self",
-              "node_id",
-              "depth",
-              "min_weight",
-              "max_results"
-            ],
-            "calls": [
-              "self.graph.has_node",
-              "range",
-              "self.graph.successors",
-              "get",
-              "new_frontier.append",
-              "get",
-              "visited.items",
-              "results.sort"
-            ],
-            "start_line": 309,
-            "end_line": 357,
-            "code": "def get_related_nodes(\n        self,\n        node_id: str,\n        depth: int = 2,\n        min_weight: float = 0.05,\n        max_results: int = 20\n    ) -> List[Tuple[str, float, str]]:\n        \"\"\"\n        Get nodes related to a given node.\n        \n        Args:\n            node_id: Starting node ID\n            depth: How many hops to traverse\n            min_weight: Minimum edge weight to follow\n            max_results: Maximum number of results\n            \n        Returns:\n            List of (node_id, relevance_score, node_type) tuples\n        \"\"\"\n        if not self.graph.has_node(node_id):\n            return []\n        \n        visited = {node_id: 1.0}\n        frontier = [(node_id, 1.0)]\n        \n        for _ in range(depth):\n            new_frontier = []\n            for current, current_score in frontier:\n                for neighbor in self.graph.successors(current):\n                    edge_weight = self.graph[current][neighbor].get(\"weight\", 0)\n                    if edge_weight < min_weight:\n                        continue\n                    \n                    new_score = current_score * edge_weight\n                    if neighbor not in visited or visited[neighbor] < new_score:\n                        visited[neighbor] = new_score\n                        new_frontier.append((neighbor, new_score))\n            \n            frontier = new_frontier\n        \n        # Sort by relevance and return\n        results = [\n            (nid, score, self.graph.nodes[nid].get(\"node_type\", \"concept\"))\n            for nid, score in visited.items()\n            if nid != node_id\n        ]\n        results.sort(key=lambda x: x[1], reverse=True)\n        \n        return results[:max_results]"
-          },
-          "get_summary": {
-            "args": [
-              "self",
-              "max_nodes",
-              "max_edges_per_node",
-              "include_weights"
-            ],
-            "calls": [
-              "nx.pagerank",
-              "sorted",
-              "pagerank.items",
-              "sorted",
-              "d.get",
-              "self.graph.nodes",
-              "lines.append",
-              "node_data.get",
-              "node_data.get",
-              "lines.append",
-              "get",
-              "get",
-              "self.graph.successors",
-              "edges.sort",
-              "lines.append",
-              "lines.append",
-              "join"
-            ],
-            "start_line": 359,
-            "end_line": 415,
-            "code": "def get_summary(\n        self,\n        max_nodes: int = 15,\n        max_edges_per_node: int = 5,\n        include_weights: bool = True\n    ) -> str:\n        \"\"\"\n        Get a text summary of the graph for prompt injection.\n        \n        Args:\n            max_nodes: Maximum nodes to include\n            max_edges_per_node: Maximum edges per node\n            include_weights: Include edge weights in summary\n            \n        Returns:\n            Formatted string summary\n        \"\"\"\n        if self.node_count == 0:\n            return \"No prior state. This is a fresh session.\"\n        \n        # Get most important nodes by pagerank\n        try:\n            pagerank = nx.pagerank(self.graph, alpha=0.85)\n            top_nodes = sorted(pagerank.items(), key=lambda x: x[1], reverse=True)[:max_nodes]\n        except:\n            # Fallback to activation-based ranking\n            top_nodes = sorted(\n                [(n, d.get(\"activation\", 0)) for n, d in self.graph.nodes(data=True)],\n                key=lambda x: x[1],\n                reverse=True\n            )[:max_nodes]\n        \n        lines = [\"## Prior Knowledge State (Memory Graph)\"]\n        lines.append(f\"Total: {self.node_count} concepts, {self.edge_count} relations\\n\")\n        \n        for node_id, importance in top_nodes:\n            node_data = self.graph.nodes[node_id]\n            node_type = node_data.get(\"node_type\", \"concept\")\n            activation = node_data.get(\"activation\", 1.0)\n            \n            lines.append(f\"### {node_id} [{node_type}] (relevance: {importance:.3f})\")\n            \n            # Get top edges\n            edges = [\n                (tgt, self.graph[node_id][tgt].get(\"weight\", 0),\n                 self.graph[node_id][tgt].get(\"relation_type\", \"related_to\"))\n                for tgt in self.graph.successors(node_id)\n            ]\n            edges.sort(key=lambda x: x[1], reverse=True)\n            \n            for target, weight, rel_type in edges[:max_edges_per_node]:\n                if include_weights:\n                    lines.append(f\"  \u2192 {target} ({rel_type}, w={weight:.3f})\")\n                else:\n                    lines.append(f\"  \u2192 {target} ({rel_type})\")\n        \n        return \"\\n\".join(lines)"
-          },
-          "search": {
-            "args": [
-              "self",
-              "query",
-              "top_k"
-            ],
-            "calls": [
-              "query.lower",
-              "set",
-              "query_lower.split",
-              "self.graph.nodes",
-              "node_id.lower",
-              "results.append",
-              "results.append",
-              "set",
-              "split",
-              "replace",
-              "node_lower.replace",
-              "len",
-              "max",
-              "len",
-              "results.append",
-              "results.sort"
-            ],
-            "start_line": 417,
-            "end_line": 449,
-            "code": "def search(self, query: str, top_k: int = 10) -> List[Tuple[str, float]]:\n        \"\"\"\n        Simple keyword search in the graph.\n        \n        Args:\n            query: Search query\n            top_k: Number of results\n            \n        Returns:\n            List of (node_id, score) tuples\n        \"\"\"\n        query_lower = query.lower()\n        query_words = set(query_lower.split())\n        \n        results = []\n        for node_id in self.graph.nodes():\n            node_lower = node_id.lower()\n            \n            # Exact match\n            if query_lower == node_lower:\n                results.append((node_id, 1.0))\n            # Contains query\n            elif query_lower in node_lower:\n                results.append((node_id, 0.8))\n            # Word overlap\n            else:\n                node_words = set(node_lower.replace(\"_\", \" \").replace(\"-\", \" \").split())\n                overlap = len(query_words & node_words) / max(len(query_words), 1)\n                if overlap > 0:\n                    results.append((node_id, overlap * 0.6))\n        \n        results.sort(key=lambda x: x[1], reverse=True)\n        return results[:top_k]"
-          },
-          "to_dict": {
-            "args": [
-              "self"
-            ],
-            "calls": [
-              "self.graph.nodes",
-              "self.graph.edges"
-            ],
-            "start_line": 451,
-            "end_line": 471,
-            "code": "def to_dict(self) -> dict:\n        \"\"\"Serialize graph to dictionary.\"\"\"\n        return {\n            \"nodes\": [\n                {\"id\": n, **self.graph.nodes[n]}\n                for n in self.graph.nodes()\n            ],\n            \"edges\": [\n                {\"source\": s, \"target\": t, **self.graph[s][t]}\n                for s, t in self.graph.edges()\n            ],\n            \"config\": {\n                \"learning_rate\": self.learning_rate,\n                \"decay_rate\": self.decay_rate,\n                \"activation_threshold\": self.activation_threshold,\n                \"max_nodes\": self.max_nodes,\n                \"max_edges\": self.max_edges,\n                \"prune_threshold\": self.prune_threshold\n            },\n            \"stats\": self.stats\n        }"
-          },
-          "from_dict": {
-            "args": [
-              "cls",
-              "data"
-            ],
-            "calls": [
-              "data.get",
-              "cls",
-              "config.get",
-              "config.get",
-              "config.get",
-              "config.get",
-              "config.get",
-              "config.get",
-              "data.get",
-              "node.pop",
-              "graph.graph.add_node",
-              "data.get",
-              "edge.pop",
-              "edge.pop",
-              "graph.graph.add_edge",
-              "data.get"
-            ],
-            "start_line": 474,
-            "end_line": 500,
-            "code": "def from_dict(cls, data: dict) -> \"MemoryGraph\":\n        \"\"\"Deserialize graph from dictionary.\"\"\"\n        config = data.get(\"config\", {})\n        graph = cls(\n            learning_rate=config.get(\"learning_rate\", 0.05),\n            decay_rate=config.get(\"decay_rate\", 0.01),\n            activation_threshold=config.get(\"activation_threshold\", 0.3),\n            max_nodes=config.get(\"max_nodes\", 1000),\n            max_edges=config.get(\"max_edges\", 5000),\n            prune_threshold=config.get(\"prune_threshold\", 0.01)\n        )\n        \n        # Add nodes\n        for node in data.get(\"nodes\", []):\n            node_id = node.pop(\"id\")\n            graph.graph.add_node(node_id, **node)\n        \n        # Add edges\n        for edge in data.get(\"edges\", []):\n            source = edge.pop(\"source\")\n            target = edge.pop(\"target\")\n            graph.graph.add_edge(source, target, **edge)\n        \n        # Restore stats\n        graph.stats = data.get(\"stats\", graph.stats)\n        \n        return graph"
-          },
-          "to_json": {
-            "args": [
-              "self"
-            ],
-            "calls": [
-              "json.dumps",
-              "self.to_dict"
-            ],
-            "start_line": 502,
-            "end_line": 504,
-            "code": "def to_json(self) -> str:\n        \"\"\"Serialize graph to JSON string.\"\"\"\n        return json.dumps(self.to_dict(), indent=2)"
-          },
-          "from_json": {
-            "args": [
-              "cls",
-              "json_str"
-            ],
-            "calls": [
-              "cls.from_dict",
-              "json.loads"
-            ],
-            "start_line": 507,
-            "end_line": 509,
-            "code": "def from_json(cls, json_str: str) -> \"MemoryGraph\":\n        \"\"\"Deserialize graph from JSON string.\"\"\"\n        return cls.from_dict(json.loads(json_str))"
-          },
-          "clear": {
-            "args": [
-              "self"
-            ],
-            "calls": [
-              "self.graph.clear"
-            ],
-            "start_line": 511,
-            "end_line": 519,
-            "code": "def clear(self):\n        \"\"\"Clear the entire graph.\"\"\"\n        self.graph.clear()\n        self.stats = {\n            \"total_updates\": 0,\n            \"nodes_added\": 0,\n            \"edges_added\": 0,\n            \"edges_pruned\": 0\n        }"
-          },
-          "get_stats": {
-            "args": [
-              "self"
-            ],
-            "calls": [
-              "nx.density"
-            ],
-            "start_line": 521,
-            "end_line": 528,
-            "code": "def get_stats(self) -> dict:\n        \"\"\"Get graph statistics.\"\"\"\n        return {\n            **self.stats,\n            \"node_count\": self.node_count,\n            \"edge_count\": self.edge_count,\n            \"density\": nx.density(self.graph) if self.node_count > 0 else 0\n        }"
-          }
-        }
-      }
-    },
-    "imports": [
-      "json",
-      "math",
-      "typing",
-      "dataclasses",
-      "datetime",
-      "networkx"
-    ],
-    "folder": "graph",
-    "module": "memory_graph"
-  },
-  "repos\\ATLAS\\parser\\repo_cloner.py": {
-    "file_path": "repos\\ATLAS\\parser\\repo_cloner.py",
-    "functions": {},
-    "classes": {
-      "RepoCloner": {
-        "inherits": [],
-        "methods": {
-          "__init__": {
-            "args": [
-              "self",
-              "base_dir"
-            ],
-            "calls": [
-              "os.makedirs"
-            ],
-            "start_line": 7,
-            "end_line": 9,
-            "code": "def __init__(self, base_dir=\"repos\"):\n        self.base_dir = base_dir\n        os.makedirs(self.base_dir, exist_ok=True)"
-          },
-          "_remove_readonly": {
-            "args": [
-              "self",
-              "func",
-              "path",
-              "excinfo"
-            ],
-            "calls": [
-              "os.chmod",
-              "func"
-            ],
-            "start_line": 11,
-            "end_line": 13,
-            "code": "def _remove_readonly(self, func, path, excinfo):\n        os.chmod(path, stat.S_IWRITE)\n        func(path)"
-          },
-          "clone_repo": {
-            "args": [
-              "self",
-              "repo_url"
-            ],
-            "calls": [
-              "replace",
-              "repo_url.split",
-              "os.path.join",
-              "os.path.exists",
-              "Repo",
-              "print",
-              "repo.remotes.origin.pull",
-              "print",
-              "shutil.rmtree",
-              "print",
-              "Repo.clone_from",
-              "print",
-              "print",
-              "Repo.clone_from",
-              "print"
-            ],
-            "start_line": 15,
-            "end_line": 37,
-            "code": "def clone_repo(self, repo_url):\n        repo_name = repo_url.split(\"/\")[-1].replace(\".git\", \"\")\n        clone_path = os.path.join(self.base_dir, repo_name)\n\n        if os.path.exists(clone_path):\n            try:\n                # Try to open existing repo\n                repo = Repo(clone_path)\n                print(f\"Repo already exists. Pulling latest changes from {repo_url}...\")\n                repo.remotes.origin.pull()\n            except GitCommandError:\n                # If repo is corrupted or not a git repo, delete and reclone\n                print(\"Existing folder is not a valid git repo. Deleting and recloning...\")\n                shutil.rmtree(clone_path, onerror=self._remove_readonly)\n                print(f\"Cloning {repo_url}...\")\n                Repo.clone_from(repo_url, clone_path)\n                print(\"Clone completed.\")\n        else:\n            print(f\"Cloning {repo_url}...\")\n            Repo.clone_from(repo_url, clone_path)\n            print(\"Clone completed.\")\n\n        return clone_path"
-          }
-        }
-      }
-    },
-    "imports": [
-      "os",
-      "shutil",
-      "stat",
-      "git"
-    ],
-    "folder": "parser",
-    "module": "repo_cloner"
-  },
-  "repos\\ATLAS\\parser\\repo_parser.py": {
-    "file_path": "repos\\ATLAS\\parser\\repo_parser.py",
-    "functions": {},
-    "classes": {
-      "FunctionCallCollector": {
-        "inherits": [
-          "ast.NodeVisitor"
-        ],
-        "methods": {
-          "__init__": {
-            "args": [
-              "self"
-            ],
-            "calls": [],
-            "start_line": 7,
-            "end_line": 8,
-            "code": "def __init__(self):\n        self.calls=[]"
-          },
-          "visit_Call": {
-            "args": [
-              "self",
-              "node"
-            ],
-            "calls": [
-              "isinstance",
-              "self.calls.append",
-              "isinstance",
-              "isinstance",
-              "name_chain.append",
-              "isinstance",
-              "name_chain.append",
-              "join",
-              "reversed",
-              "self.calls.append",
-              "self.generic_visit"
-            ],
-            "start_line": 10,
-            "end_line": 27,
-            "code": "def visit_Call(self, node):\n        if isinstance(node.func,ast.Name):\n            self.calls.append(node.func.id)\n\n        elif isinstance(node.func,ast.Attribute):\n            name_chain=[]\n            current=node.func\n\n            while isinstance(current,ast.Attribute):\n                name_chain.append(current.attr)\n                current=current.value\n            \n            if isinstance(current,ast.Name):\n                name_chain.append(current.id)\n\n            full_name=\".\".join(reversed(name_chain))\n            self.calls.append(full_name)\n        self.generic_visit(node)"
-          }
-        }
-      },
-      "CodeParser": {
-        "inherits": [],
-        "methods": {
-          "get_source_segment": {
-            "args": [
-              "self",
-              "file_path",
-              "node"
-            ],
-            "calls": [
-              "open",
-              "f.read",
-              "ast.get_source_segment"
-            ],
-            "start_line": 31,
-            "end_line": 34,
-            "code": "def get_source_segment(self,file_path,node):\n        with open(file_path,\"r\",encoding='utf-8') as f:\n            source=f.read()\n        return ast.get_source_segment(source,node)"
-          },
-          "extract_function_data": {
-            "args": [
-              "self",
-              "file_path",
-              "node"
-            ],
-            "calls": [
-              "FunctionCallCollector",
-              "collector.visit",
-              "self.get_source_segment",
-              "getattr"
-            ],
-            "start_line": 36,
-            "end_line": 48,
-            "code": "def extract_function_data(self,file_path,node):\n        collector=FunctionCallCollector()\n        collector.visit(node)\n\n        code=self.get_source_segment(file_path,node)\n        args=[arg.arg for arg in node.args.args]\n        return {\n            \"args\":args,\n            \"calls\":collector.calls,\n            \"start_line\": node.lineno,\n            \"end_line\": getattr(node, \"end_lineno\", node.lineno),\n            \"code\": code\n        }"
-          },
-          "parse_file": {
-            "args": [
-              "self",
-              "file_path"
-            ],
-            "calls": [
-              "open",
-              "f.read",
-              "ast.parse",
-              "print",
-              "isinstance",
-              "self.extract_function_data",
-              "isinstance",
-              "isinstance",
-              "self.extract_function_data",
-              "isinstance",
-              "bases.append",
-              "isinstance",
-              "isinstance",
-              "name_chain.append",
-              "isinstance",
-              "name_chain.append",
-              "bases.append",
-              "join",
-              "reversed",
-              "isinstance",
-              "imports.append",
-              "isinstance",
-              "imports.append"
-            ],
-            "start_line": 50,
-            "end_line": 107,
-            "code": "def parse_file(self,file_path):\n\n        with open(file_path,\"r\",encoding='utf-8') as f:\n            source=f.read()\n        \n        try:\n            tree=ast.parse(source)\n        \n        except SyntaxError:\n            print(f\"skipping file with syntax error ..  {file_path}\")\n            return None\n        functions={}\n        classes={}\n        imports=[]\n\n        for node in tree.body:\n            if isinstance(node,ast.FunctionDef):\n                functions[node.name]= self.extract_function_data(file_path,node)\n\n            elif isinstance(node,ast.ClassDef):\n                method_dict={}\n\n                for item in node.body:\n                    if isinstance(item,ast.FunctionDef):\n                        method_dict[item.name]= self.extract_function_data(file_path,item)\n\n                bases=[]\n                for base in node.bases:\n                    if isinstance(base,ast.Name):\n                        bases.append(base.id)\n                    elif isinstance(base, ast.Attribute):\n                        name_chain = []\n                        current = base\n                        while isinstance(current, ast.Attribute):\n                            name_chain.append(current.attr)\n                            current = current.value\n                        if isinstance(current, ast.Name):\n                            name_chain.append(current.id)\n                        bases.append(\".\".join(reversed(name_chain)))\n\n                classes[node.name]={\n                    \"inherits\":bases,\n                    \"methods\":method_dict\n                }\n            elif isinstance(node,ast.Import):\n                for alias in node.names:\n                    imports.append(alias.name)\n            \n            elif isinstance(node,ast.ImportFrom):\n                if node.module:\n                    imports.append(node.module)\n            \n        return {\n            \"file_path\":file_path,\n            \"functions\":functions,\n            \"classes\":classes,\n            \"imports\":imports\n        }"
-          },
-          "parse_repository": {
-            "args": [
-              "self",
-              "repo_path"
-            ],
-            "calls": [
-              "os.walk",
-              "file.endswith",
-              "os.path.join",
-              "self.parse_file"
-            ],
-            "start_line": 109,
-            "end_line": 121,
-            "code": "def parse_repository(self,repo_path):\n        parsed_data={}\n\n        for root, _, files in os.walk(repo_path):\n            for file in files:\n                if file.endswith(\".py\"):\n                    full_path=os.path.join(root,file)\n\n                    result=self.parse_file(full_path)\n\n                    if result:\n                        parsed_data[full_path]=result \n        return parsed_data"
-          }
-        }
-      }
-    },
-    "imports": [
-      "ast",
-      "os"
-    ],
-    "folder": "parser",
-    "module": "repo_parser"
-  },
-  "repos\\ATLAS\\parser\\__init__.py": {
-    "file_path": "repos\\ATLAS\\parser\\__init__.py",
-    "functions": {},
-    "classes": {},
-    "imports": [],
-    "folder": "parser",
-    "module": "__init__"
-  },
-  "repos\\ATLAS\\semantic\\embeddings.py": {
-    "file_path": "repos\\ATLAS\\semantic\\embeddings.py",
     "functions": {
-      "get_embeddings": {
+      "vga_entry": {
         "args": [
-          "text"
+          "c",
+          "fg",
+          "bg"
         ],
-        "calls": [
-          "tolist",
-          "embedder.encode"
-        ],
-        "start_line": 18,
+        "calls": [],
+        "start_line": 10,
+        "end_line": 13,
+        "code": "static inline uint16_t vga_entry(char c, vga_color_t fg, vga_color_t bg) {\n    uint8_t color = (bg << 4) | (fg & 0x0F);\n    return (uint16_t)c | (uint16_t)color << 8;\n}"
+      },
+      "vga_init": {
+        "args": [],
+        "calls": [],
+        "start_line": 16,
         "end_line": 19,
-        "code": "def get_embeddings(text: str):\n    return embedder.encode(text).tolist()"
+        "code": "void vga_init(void) {\n    cursor_x = 0;\n    cursor_y = 0;\n}"
       },
-      "build_semantic_memmory": {
-        "args": [
-          "parsed_repo"
-        ],
+      "vga_clear": {
+        "args": [],
         "calls": [
-          "parsed_repo.items",
-          "data.get",
-          "data.get",
-          "join",
-          "data.get",
-          "items",
-          "data.get",
-          "func_data.get",
-          "items",
-          "data.get",
-          "class_data.get",
-          "get_embeddings",
-          "collection.add",
-          "print",
-          "items",
-          "data.get",
-          "func_data.get",
-          "get_embeddings",
-          "collection.add",
-          "print",
-          "items",
-          "data.get",
-          "class_data.get",
-          "get_embeddings",
-          "collection.add",
-          "print",
-          "time.sleep",
-          "print",
-          "print",
-          "collection.count"
+          "vga_entry"
         ],
         "start_line": 22,
-        "end_line": 107,
-        "code": "def build_semantic_memmory(parsed_repo: Dict[str, Dict]):\n    doc_id = 0\n\n    for file_path, data in parsed_repo.items():\n\n        folder = data.get(\"folder\", \"\")\n        module = data.get(\"module\", \"\")\n\n        # ----------------- FILE LEVEL EMBEDDING -----------------\n        file_text = \"\"\n        file_text += \"\\n\".join(data.get(\"imports\", [])) + \"\\n\"\n        file_text += f\"# module: {module} folder: {folder}\\n\"\n\n        for func_name, func_data in data.get(\"functions\", {}).items():\n            file_text += func_data.get(\"code\", func_name) + \"\\n\"\n\n        for class_name, class_data in data.get(\"classes\", {}).items():\n            # class_data may not have 'code' if parser doesn't store full class code\n            class_code = class_data.get(\"code\", \"\")\n            file_text += class_code + \"\\n\"\n\n        try:\n            embedding = get_embeddings(file_text)\n            collection.add(\n                documents=[file_text],\n                embeddings=[embedding],\n                metadatas=[{\n                    \"type\": \"file\",\n                    \"path\": file_path,\n                    \"folder\": folder,\n                    \"module\": module\n                }],\n                ids=[f\"doc_{doc_id}\"]\n            )\n            doc_id += 1\n        except Exception as e:\n            print(f\"Embedding failed for file {file_path}: {e}\")\n\n        # ----------------- FUNCTION LEVEL EMBEDDING -----------------\n        for func_name, func_data in data.get(\"functions\", {}).items():\n            func_code = func_data.get(\"code\", func_name)\n            try:\n                embedding = get_embeddings(func_code)\n                collection.add(\n                    documents=[func_code],\n                    embeddings=[embedding],\n                    metadatas=[{\n                        \"type\": \"function\",\n                        \"path\": file_path,\n                        \"folder\": folder,\n                        \"module\": module,\n                        \"name\": func_name\n                    }],\n                    ids=[f\"doc_{doc_id}\"]\n                )\n                doc_id += 1\n            except Exception as e:\n                print(f\"Embedding failed for function {func_name}: {e}\")\n\n        # ----------------- CLASS LEVEL EMBEDDING -----------------\n        for class_name, class_data in data.get(\"classes\", {}).items():\n            class_code = class_data.get(\"code\", class_name)  # fallback to name\n            try:\n                embedding = get_embeddings(class_code)\n                collection.add(\n                    documents=[class_code],\n                    embeddings=[embedding],\n                    metadatas=[{\n                        \"type\": \"class\",\n                        \"path\": file_path,\n                        \"folder\": folder,\n                        \"module\": module,\n                        \"name\": class_name\n                    }],\n                    ids=[f\"doc_{doc_id}\"]\n                )\n                doc_id += 1\n            except Exception as e:\n                print(f\"Embedding failed for class {class_name}: {e}\")\n\n        # slight throttle to avoid overloading\n        time.sleep(0.1)\n\n    print(\"Semantic memory stored in ChromaDB\")\n    print(\"Collection info:\", collection.count())\n    return collection"
-      }
-    },
-    "classes": {},
-    "imports": [
-      "os",
-      "time",
-      "chromadb",
-      "chromadb.config",
-      "typing",
-      "sentence_transformers"
-    ],
-    "folder": "semantic",
-    "module": "embeddings"
-  },
-  "repos\\ATLAS\\semantic\\retrieval.py": {
-    "file_path": "repos\\ATLAS\\semantic\\retrieval.py",
-    "functions": {},
-    "classes": {
-      "CodeRetriever": {
-        "inherits": [],
-        "methods": {
-          "__init__": {
-            "args": [
-              "self",
-              "collection",
-              "graph_store",
-              "top_k",
-              "embed_model_name"
-            ],
-            "calls": [
-              "SentenceTransformer"
-            ],
-            "start_line": 8,
-            "end_line": 13,
-            "code": "def __init__(self, collection: Collection, graph_store: GraphStore, top_k: int = 5,\n                 embed_model_name: str = \"sentence-transformers/all-MiniLM-L6-v2\"):\n        self.collection = collection\n        self.graph_store = graph_store\n        self.top_k = top_k\n        self.embed_model = SentenceTransformer(embed_model_name)"
-          },
-          "_build_node_id": {
-            "args": [
-              "self",
-              "metadata"
-            ],
-            "calls": [
-              "metadata.get",
-              "metadata.get",
-              "metadata.get"
-            ],
-            "start_line": 15,
-            "end_line": 29,
-            "code": "def _build_node_id(self, metadata: dict) -> str:\n        \"\"\"Reconstruct full node ID to match graph builder naming.\"\"\"\n        node_type = metadata.get(\"type\")\n        path = metadata.get(\"path\")\n        name = metadata.get(\"name\")\n\n        if node_type == \"function\":\n            return f\"{path}::{name}\"\n        elif node_type == \"class\":\n            return f\"{path}::{name}\"\n        elif node_type == \"method\":\n            # For methods, path should already include class name\n            return f\"{path}::{name}\"\n        else:\n            return path"
-          },
-          "retrieve": {
-            "args": [
-              "self",
-              "query",
-              "expand_depth",
-              "node_types"
-            ],
-            "calls": [
-              "tolist",
-              "self.embed_model.encode",
-              "self.collection.query",
-              "enumerate",
-              "self._build_node_id",
-              "metadata.get",
-              "sem_nodes.append",
-              "self.collection.get",
-              "np.array",
-              "np.array",
-              "np.dot",
-              "np.linalg.norm",
-              "np.linalg.norm",
-              "float",
-              "set",
-              "self.graph_store.get_full_downstream",
-              "self.graph_store.get_full_upstream",
-              "expanded_nodes.update",
-              "expanded_nodes.update",
-              "expanded_nodes.update",
-              "get",
-              "sem_scores.get",
-              "combined_results.sort"
-            ],
-            "start_line": 31,
-            "end_line": 87,
-            "code": "def retrieve(self, query: str, expand_depth: int = 2,\n                 node_types: List[str] = [\"function\", \"method\", \"class\"]):\n        # Encode the query\n        query_vec = self.embed_model.encode(query).tolist()\n\n        # Query Chroma collection\n        results = self.collection.query(\n            query_embeddings=[query_vec],\n            n_results=self.top_k\n        )\n\n        sem_nodes = []\n        sem_scores = {}\n\n        # Process each returned document\n        for i, metadata in enumerate(results['metadatas'][0]):\n            node_id = self._build_node_id(metadata)\n            node_type = metadata.get(\"type\")\n\n            if node_type in node_types and node_id in self.graph_store.graph.nodes:\n                sem_nodes.append(node_id)\n\n                # If Chroma provides distances, use them\n                if results['distances'] and results['distances'][0]:\n                    distance = results['distances'][0][i]\n                    sem_scores[node_id] = 1 - distance  # cosine distance -> similarity\n                else:\n                    # Fallback: compute cosine similarity manually\n                    node_embedding_data = self.collection.get(ids=[results['ids'][0][i]])\n                    node_embedding = np.array(node_embedding_data['embeddings'][0][0])\n                    query_vec_np = np.array(query_vec)\n                    cos_sim = np.dot(query_vec_np, node_embedding) / (\n                        np.linalg.norm(query_vec_np) * np.linalg.norm(node_embedding)\n                    )\n                    sem_scores[node_id] = float(cos_sim)\n\n        # Expand nodes in the graph (upstream and downstream)\n        expanded_nodes = set()\n        for node in sem_nodes:\n            downstream = self.graph_store.get_full_downstream(node)\n            upstream = self.graph_store.get_full_upstream(node)\n            expanded_nodes.update(downstream)\n            expanded_nodes.update(upstream)\n        expanded_nodes.update(sem_nodes)\n\n        # Filter by node types if requested\n        if node_types:\n            expanded_nodes = [\n                n for n in expanded_nodes\n                if self.graph_store.graph.nodes[n].get(\"type\") in node_types\n            ]\n\n        # Combine results with similarity scores (default 0.5 if missing)\n        combined_results = [(node, sem_scores.get(node, 0.5)) for node in expanded_nodes]\n        combined_results.sort(key=lambda x: x[1], reverse=True)\n\n        return combined_results"
-          }
-        }
-      }
-    },
-    "imports": [
-      "sentence_transformers",
-      "chromadb.api.models.Collection",
-      "graph.graph_store",
-      "typing",
-      "numpy"
-    ],
-    "folder": "semantic",
-    "module": "retrieval"
-  },
-  "repos\\ATLAS\\semantic\\__init__.py": {
-    "file_path": "repos\\ATLAS\\semantic\\__init__.py",
-    "functions": {},
-    "classes": {},
-    "imports": [],
-    "folder": "semantic",
-    "module": "__init__"
-  },
-  "repos\\ATLAS\\utils\\context_builder.py": {
-    "file_path": "repos\\ATLAS\\utils\\context_builder.py",
-    "functions": {
-      "build_context": {
-        "args": [
-          "retriever",
-          "graph_store",
-          "query",
-          "top_k"
-        ],
-        "calls": [
-          "retriever.retrieve",
-          "graph_store.get_upstream_dependencies",
-          "folders.append",
-          "max",
-          "set",
-          "set",
-          "graph_store.get_upstream_dependencies",
-          "imports.update",
-          "graph_store.graph.nodes.get"
-        ],
-        "start_line": 3,
-        "end_line": 27,
-        "code": "def build_context(retriever,graph_store:GraphStore,query:str,top_k:int=5):\n    results=retriever.retrieve(query)\n    folders=[]\n    for node,_ in results:\n        preds=graph_store.get_upstream_dependencies(node,types=[\"file\"])\n        if preds:\n            folders.append(preds[0])\n    target_folder=max(set(folders),key=folders.count) if folders else \"new_folder\"\n\n    imports=set()\n    for node,_ in results:\n        preds=graph_store.get_upstream_dependencies(node,types=[\"file\"])\n        imports.update(preds)\n\n    relevant_code={}\n    for node,_ in results[:top_k]:\n        node_data=graph_store.graph.nodes.get(node)\n        if node_data and \"code\" in node_data:\n            relevant_code[node]=node_data[\"code\"]\n    \n    return {\n        \"target_folder\":target_folder,\n        \"imports\":imports,\n        \"relevant_code_snippets\":relevant_code\n    }"
-      }
-    },
-    "classes": {},
-    "imports": [
-      "graph.graph_store"
-    ],
-    "folder": "utils",
-    "module": "context_builder"
-  },
-  "repos\\ATLAS\\utils\\executor.py": {
-    "file_path": "repos\\ATLAS\\utils\\executor.py",
-    "functions": {
-      "execute_plan": {
-        "args": [
-          "plan_code",
-          "target_folder",
-          "file_name"
-        ],
-        "calls": [
-          "os.makedirs",
-          "os.path.join",
-          "open",
-          "f.write"
-        ],
-        "start_line": 2,
-        "end_line": 7,
-        "code": "def execute_plan(plan_code:str,target_folder:str,file_name:str=\"new_feature.py\"):\n    os.makedirs(target_folder, exist_ok=True)\n    file_path = os.path.join(target_folder, file_name)\n    with open(file_path, \"w\", encoding=\"utf-8\") as f:\n        f.write(plan_code)\n    return file_path"
-      }
-    },
-    "classes": {},
-    "imports": [
-      "os"
-    ],
-    "folder": "utils",
-    "module": "executor"
-  },
-  "repos\\ATLAS\\utils\\llm_call.py": {
-    "file_path": "repos\\ATLAS\\utils\\llm_call.py",
-    "functions": {
-      "ask_llm": {
-        "args": [
-          "prompt",
-          "max_tokens",
-          "temperature"
-        ],
-        "calls": [
-          "bedrock_client.invoke_model",
-          "BytesIO",
-          "encode",
-          "json.dumps",
-          "read",
-          "raw_body.decode",
-          "print",
-          "json.loads",
-          "get",
-          "str"
-        ],
-        "start_line": 22,
-        "end_line": 56,
-        "code": "def ask_llm(prompt: str, max_tokens: int = 512, temperature: float = 0.5) -> str:\n    import json, boto3\n    from io import BytesIO\n\n    payload = {\n        \"anthropic_version\": \"bedrock-2023-05-31\",\n        \"max_tokens\": max_tokens,\n        \"temperature\": temperature,\n        \"messages\": [{\"role\": \"user\", \"content\": prompt}]\n    }\n\n    response = bedrock_client.invoke_model(\n        modelId=LLM_MODEL,\n        body=BytesIO(json.dumps(payload).encode(\"utf-8\")),\n        contentType=\"application/json\",\n        accept=\"application/json\"\n    )\n\n    raw_body = response[\"body\"].read()\n    raw_text = raw_body.decode()\n    print(\"\\n--- RAW RESPONSE ---\\n\", raw_text, \"\\n--- END RAW RESPONSE ---\\n\")\n\n    try:\n        result = json.loads(raw_text)\n        # Check multiple structures\n        if \"choices\" in result:\n            return result[\"choices\"][0][\"message\"][\"content\"]\n        elif \"content\" in result:\n            return result[\"content\"][0].get(\"text\", \"\")\n        elif \"completion\" in result:\n            return result[\"completion\"]\n        else:\n            return str(result)\n    except json.JSONDecodeError:\n        return raw_text"
-      }
-    },
-    "classes": {},
-    "imports": [
-      "json",
-      "boto3",
-      "io",
-      "typing"
-    ],
-    "folder": "utils",
-    "module": "llm_call"
-  },
-  "repos\\ATLAS\\utils\\planner.py": {
-    "file_path": "repos\\ATLAS\\utils\\planner.py",
-    "functions": {
-      "explain_repo": {
-        "args": [
-          "context",
-          "user_query"
-        ],
-        "calls": [
-          "context.get",
-          "join",
-          "chr",
-          "context.get",
-          "context.get",
-          "join",
-          "list",
-          "keys",
-          "context.get",
-          "ask_llm"
-        ],
-        "start_line": 5,
-        "end_line": 34,
-        "code": "def explain_repo(context: dict, user_query: str):\n    prompt = f\"\"\"\nYou are an expert codebase analyst.\n\nYour job is to HELP the user understand the repository based on context.\n\n# Repository Overview:\n{context.get('repo_summary', 'No summary available.')}\n\n# Module Summaries:\n{chr(10).join([f\"- {c['summary']}\" for c in context.get('module_summaries', [])])}\n\n# Repository Structure:\n{context.get('repo_structure', 'Not provided.')}\n\n# Relevant Code Snippets (names only):\n{', '.join(list(context.get('retrieved_code', {}).keys()))}\n\n# User Question:\n{user_query}\n\nInstructions:\n- Answer the question clearly and directly\n- Explain flow (how data moves, which functions are used)\n- Reference relevant functions/modules when needed\n- Keep it structured but not too long\n- DO NOT generate code unless explicitly asked\n\"\"\"\n\n    return ask_llm(prompt)"
+        "end_line": 31,
+        "code": "void vga_clear(void) {\n    for (int y = 0; y < VGA_HEIGHT; y++) {\n        for (int x = 0; x < VGA_WIDTH; x++) {\n            const int index = y * VGA_WIDTH + x;\n            vga_buffer[index] = vga_entry(' ', VGA_COLOR_WHITE, VGA_COLOR_BLACK);\n        }\n    }\n    cursor_x = 0;\n    cursor_y = 0;\n}"
       },
-      "plan_code": {
+      "vga_scroll": {
+        "args": [],
+        "calls": [
+          "vga_entry"
+        ],
+        "start_line": 34,
+        "end_line": 48,
+        "code": "static void vga_scroll(void) {\n    // Move all lines up\n    for (int y = 0; y < VGA_HEIGHT - 1; y++) {\n        for (int x = 0; x < VGA_WIDTH; x++) {\n            vga_buffer[y * VGA_WIDTH + x] = vga_buffer[(y + 1) * VGA_WIDTH + x];\n        }\n    }\n    \n    // Clear last line\n    for (int x = 0; x < VGA_WIDTH; x++) {\n        vga_buffer[(VGA_HEIGHT - 1) * VGA_WIDTH + x] = vga_entry(' ', VGA_COLOR_WHITE, VGA_COLOR_BLACK);\n    }\n    \n    cursor_y = VGA_HEIGHT - 1;\n}"
+      },
+      "vga_putchar": {
         "args": [
-          "context",
-          "user_query"
+          "c",
+          "color"
         ],
         "calls": [
-          "context.get",
-          "join",
-          "context.get",
-          "context.get",
-          "context.get",
-          "context.get",
-          "join",
-          "list",
-          "keys",
-          "context.get",
-          "ask_llm"
+          "vga_scroll",
+          "vga_scroll",
+          "vga_entry",
+          "vga_scroll"
         ],
-        "start_line": 55,
+        "start_line": 51,
         "end_line": 84,
-        "code": "def plan_code(context: dict, user_query: str):\n    prompt = f\"\"\"\nYou are adding a new feature to a Python repository.\n\n# Repository Overview:\n{context.get('repo_summary', 'No summary available.')}\n\n# Module Summaries:\n{', '.join([c['summary'] for c in context.get('module_summaries', [])])}\n\n# Repository Structure:\n{context.get('repo_structure', 'Not provided.')}\n\n# Target folder for new code: {context.get('target_folder', 'new_folder')}\n# Suggested imports: {context.get('imports', [])}\n\n# Relevant code snippets:\n{', '.join(list(context.get('retrieved_code', {}).keys()))}\n\n# Task:\n{user_query}\n\nInstructions:\n- Write a Python file skeleton (do NOT overwrite existing files)\n- Include proper imports, class/function definitions\n- Reference the relevant functions/methods from the retrieved snippets\n- Make the code integrate with existing repo structure\n- Do not write explanations, only code\n\"\"\"\n    return ask_llm(prompt)"
+        "code": "void vga_putchar(char c, vga_color_t color) {\n    if (c == '\\n') {\n        cursor_x = 0;\n        cursor_y++;\n        if (cursor_y >= VGA_HEIGHT) {\n            vga_scroll();\n        }\n        return;\n    }\n    \n    if (c == '\\t') {\n        cursor_x = (cursor_x + 4) & ~(4 - 1);\n        if (cursor_x >= VGA_WIDTH) {\n            cursor_x = 0;\n            cursor_y++;\n            if (cursor_y >= VGA_HEIGHT) {\n                vga_scroll();\n            }\n        }\n        return;\n    }\n    \n    const int index = cursor_y * VGA_WIDTH + cursor_x;\n    vga_buffer[index] = vga_entry(c, color, VGA_COLOR_BLACK);\n    \n    cursor_x++;\n    if (cursor_x >= VGA_WIDTH) {\n        cursor_x = 0;\n        cursor_y++;\n        if (cursor_y >= VGA_HEIGHT) {\n            vga_scroll();\n        }\n    }\n}"
+      },
+      "vga_print": {
+        "args": [
+          "* str",
+          "color"
+        ],
+        "calls": [
+          "vga_putchar"
+        ],
+        "start_line": 87,
+        "end_line": 91,
+        "code": "void vga_print(const char* str, vga_color_t color) {\n    for (int i = 0; str[i] != '\\0'; i++) {\n        vga_putchar(str[i], color);\n    }\n}"
+      },
+      "vga_set_cursor": {
+        "args": [
+          "x",
+          "y"
+        ],
+        "calls": [],
+        "start_line": 94,
+        "end_line": 99,
+        "code": "void vga_set_cursor(uint8_t x, uint8_t y) {\n    if (x < VGA_WIDTH && y < VGA_HEIGHT) {\n        cursor_x = x;\n        cursor_y = y;\n    }\n}"
+      },
+      "vga_print_hex": {
+        "args": [
+          "value"
+        ],
+        "calls": [
+          "vga_print"
+        ],
+        "start_line": 102,
+        "end_line": 112,
+        "code": "void vga_print_hex(uint64_t value) {\n    char hex[17];\n    const char* digits = \"0123456789abcdef\";\n    \n    for (int i = 15; i >= 0; i--) {\n        hex[15 - i] = digits[(value >> (i * 4)) & 0xF];\n    }\n    hex[16] = '\\0';\n    \n    vga_print(hex, VGA_COLOR_LIGHT_CYAN);\n}"
+      },
+      "vga_print_int": {
+        "args": [
+          "value",
+          "color"
+        ],
+        "calls": [
+          "vga_putchar",
+          "vga_putchar",
+          "vga_putchar"
+        ],
+        "start_line": 115,
+        "end_line": 144,
+        "code": "void vga_print_int(int32_t value, vga_color_t color) {\n    char buffer[12];  // -2147483648 + null terminator\n    int pos = 0;\n    \n    if (value < 0) {\n        vga_putchar('-', color);\n        value = -value;\n    }\n    \n    // Convert to decimal\n    if (value == 0) {\n        vga_putchar('0', color);\n        return;\n    }\n    \n    int divisor = 1000000000;\n    int started = 0;\n    \n    while (divisor > 0) {\n        int digit = value / divisor;\n        value %= divisor;\n        \n        if (digit != 0 || started || divisor == 1) {\n            vga_putchar('0' + digit, color);\n            started = 1;\n        }\n        \n        divisor /= 10;\n    }\n}"
       }
     },
     "classes": {},
-    "imports": [
-      "llm_call",
-      "llm_call",
-      "llm_call"
-    ],
-    "folder": "utils",
-    "module": "planner"
+    "folder": "drivers",
+    "module": "vga"
   },
-  "repos\\ATLAS\\utils\\__init__.py": {
-    "file_path": "repos\\ATLAS\\utils\\__init__.py",
+  "repos\\BlitzOS\\drivers\\vga.h": {
+    "file_path": "repos\\BlitzOS\\drivers\\vga.h",
+    "language": "c",
+    "imports": [],
     "functions": {},
     "classes": {},
+    "folder": "drivers",
+    "module": "vga"
+  },
+  "repos\\BlitzOS\\kernel\\arch\\x86_64\\context_switch.asm": {
+    "file_path": "repos\\BlitzOS\\kernel\\arch\\x86_64\\context_switch.asm",
+    "language": "assembly",
     "imports": [],
-    "folder": "utils",
-    "module": "__init__"
+    "functions": {
+      "context_switch_asm": {
+        "args": [],
+        "calls": [],
+        "start_line": 42,
+        "end_line": 68,
+        "code": "context_switch_asm:\n    ; Save current process state (if current != NULL)\n    test rdi, rdi\n    jz load_next  ; Skip saving if current is NULL\n    \n    ; Save all registers to current process\n    mov [rdi + OFFSET_RAX], rax\n    mov [rdi + OFFSET_RBX], rbx\n    mov [rdi + OFFSET_RCX], rcx\n    mov [rdi + OFFSET_RDX], rdx\n    mov [rdi + OFFSET_RSI], rsi\n    mov [rdi + OFFSET_RDI], rdi\n    mov [rdi + OFFSET_RBP], rbp\n    mov [rdi + OFFSET_RSP], rsp\n    mov [rdi + OFFSET_R8],  r8\n    mov [rdi + OFFSET_R9],  r9\n    mov [rdi + OFFSET_R10], r10\n    mov [rdi + OFFSET_R11], r11\n    mov [rdi + OFFSET_R12], r12\n    mov [rdi + OFFSET_R13], r13\n    mov [rdi + OFFSET_R14], r14\n    mov [rdi + OFFSET_R15], r15\n    \n    ; Save RIP (return address from this function)\n    mov rax, [rsp]\n    mov [rdi + OFFSET_RIP], rax"
+      },
+      "load_next": {
+        "args": [],
+        "calls": [],
+        "start_line": 69,
+        "end_line": 97,
+        "code": "load_next:\n    ; Load next process state from RSI\n    mov rax, [rsi + OFFSET_RAX]\n    mov rbx, [rsi + OFFSET_RBX]\n    mov rcx, [rsi + OFFSET_RCX]\n    mov rdx, [rsi + OFFSET_RDX]\n    mov rbp, [rsi + OFFSET_RBP]\n    mov rsp, [rsi + OFFSET_RSP]\n    mov r8,  [rsi + OFFSET_R8]\n    mov r9,  [rsi + OFFSET_R9]\n    mov r10, [rsi + OFFSET_R10]\n    mov r11, [rsi + OFFSET_R11]\n    mov r12, [rsi + OFFSET_R12]\n    mov r13, [rsi + OFFSET_R13]\n    mov r14, [rsi + OFFSET_R14]\n    mov r15, [rsi + OFFSET_R15]\n    \n    ; Load RDI and RSI last\n    mov rdi, [rsi + OFFSET_RDI]\n    push qword [rsi + OFFSET_RIP]  ; Push return address\n    mov rsi, [rsi + OFFSET_RSI]\n    \n    ; Enable interrupts\n    sti\n    \n    ; Jump to next process (RIP is on stack)\n    ret"
+      }
+    },
+    "classes": {},
+    "folder": "kernel\\arch\\x86_64",
+    "module": "context_switch"
+  },
+  "repos\\BlitzOS\\kernel\\arch\\x86_64\\idt.c": {
+    "file_path": "repos\\BlitzOS\\kernel\\arch\\x86_64\\idt.c",
+    "language": "c",
+    "imports": [
+      "idt.h",
+      "stdint.h"
+    ],
+    "functions": {
+      "idt_set_gate": {
+        "args": [
+          "num",
+          "handler",
+          "selector",
+          "flags"
+        ],
+        "calls": [],
+        "start_line": 12,
+        "end_line": 21,
+        "code": "void idt_set_gate(uint8_t num, uint64_t handler, uint16_t selector, uint8_t flags) {\n    idt[num].offset_low = handler & 0xFFFF;\n    idt[num].offset_mid = (handler >> 16) & 0xFFFF;\n    idt[num].offset_high = (handler >> 32) & 0xFFFFFFFF;\n    \n    idt[num].selector = selector;\n    idt[num].ist = 0;  // No IST for now\n    idt[num].type_attr = flags;\n    idt[num].zero = 0;\n}"
+      },
+      "idt_init": {
+        "args": [],
+        "calls": [
+          "idt_load"
+        ],
+        "start_line": 24,
+        "end_line": 42,
+        "code": "void idt_init(void) {\n    // Set up the IDT pointer\n    idtp.limit = (sizeof(idt_entry_t) * IDT_ENTRIES) - 1;\n    idtp.base = (uint64_t)&idt;\n    \n    // Clear the IDT\n    for (int i = 0; i < IDT_ENTRIES; i++) {\n        idt[i].offset_low = 0;\n        idt[i].selector = 0;\n        idt[i].ist = 0;\n        idt[i].type_attr = 0;\n        idt[i].offset_mid = 0;\n        idt[i].offset_high = 0;\n        idt[i].zero = 0;\n    }\n    \n    // Load the IDT\n    idt_load((uint64_t)&idtp);\n}"
+      }
+    },
+    "classes": {},
+    "folder": "kernel\\arch\\x86_64",
+    "module": "idt"
+  },
+  "repos\\BlitzOS\\kernel\\arch\\x86_64\\idt.h": {
+    "file_path": "repos\\BlitzOS\\kernel\\arch\\x86_64\\idt.h",
+    "language": "c",
+    "imports": [],
+    "functions": {},
+    "classes": {},
+    "folder": "kernel\\arch\\x86_64",
+    "module": "idt"
+  },
+  "repos\\BlitzOS\\kernel\\arch\\x86_64\\idt_load.asm": {
+    "file_path": "repos\\BlitzOS\\kernel\\arch\\x86_64\\idt_load.asm",
+    "language": "assembly",
+    "imports": [],
+    "functions": {
+      "idt_load": {
+        "args": [],
+        "calls": [],
+        "start_line": 5,
+        "end_line": 8,
+        "code": "idt_load:\n    lidt [rdi]  ; Load IDT pointer (first argument in rdi)\n    ret"
+      }
+    },
+    "classes": {},
+    "folder": "kernel\\arch\\x86_64",
+    "module": "idt_load"
+  },
+  "repos\\BlitzOS\\kernel\\arch\\x86_64\\interrupts.c": {
+    "file_path": "repos\\BlitzOS\\kernel\\arch\\x86_64\\interrupts.c",
+    "language": "c",
+    "imports": [
+      "interrupts.h",
+      "idt.h",
+      "../../../drivers/vga.h",
+      "../../../drivers/pit.h",
+      "../../../drivers/keyboard.h"
+    ],
+    "functions": {
+      "pic_remap": {
+        "args": [
+          "offset1",
+          "offset2"
+        ],
+        "calls": [
+          "inb",
+          "inb",
+          "outb",
+          "outb",
+          "outb",
+          "outb",
+          "outb",
+          "outb",
+          "outb",
+          "outb",
+          "outb",
+          "outb"
+        ],
+        "start_line": 44,
+        "end_line": 70,
+        "code": "void pic_remap(uint8_t offset1, uint8_t offset2) {\n    uint8_t a1, a2;\n    \n    // Save masks\n    a1 = inb(PIC1_DATA);\n    a2 = inb(PIC2_DATA);\n    \n    // Start initialization sequence\n    outb(PIC1_COMMAND, 0x11);\n    outb(PIC2_COMMAND, 0x11);\n    \n    // Set vector offsets\n    outb(PIC1_DATA, offset1);\n    outb(PIC2_DATA, offset2);\n    \n    // Tell PICs about each other\n    outb(PIC1_DATA, 0x04);  // PIC1: there is a slave PIC at IRQ2\n    outb(PIC2_DATA, 0x02);  // PIC2: cascade identity\n    \n    // Set 8086 mode\n    outb(PIC1_DATA, 0x01);\n    outb(PIC2_DATA, 0x01);\n    \n    // Restore masks\n    outb(PIC1_DATA, a1);\n    outb(PIC2_DATA, a2);\n}"
+      },
+      "pic_send_eoi": {
+        "args": [
+          "irq"
+        ],
+        "calls": [
+          "outb",
+          "outb"
+        ],
+        "start_line": 73,
+        "end_line": 78,
+        "code": "void pic_send_eoi(uint8_t irq) {\n    if (irq >= 8) {\n        outb(PIC2_COMMAND, PIC_EOI);\n    }\n    outb(PIC1_COMMAND, PIC_EOI);\n}"
+      },
+      "isr_handler": {
+        "args": [
+          "isr_number"
+        ],
+        "calls": [
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print"
+        ],
+        "start_line": 81,
+        "end_line": 94,
+        "code": "void isr_handler(uint64_t isr_number) {\n    vga_print(\"Exception: \", VGA_COLOR_LIGHT_RED);\n    if (isr_number < 32) {\n        vga_print(exception_messages[isr_number], VGA_COLOR_LIGHT_RED);\n    } else {\n        vga_print(\"Unknown\", VGA_COLOR_LIGHT_RED);\n    }\n    vga_print(\"\\n\", VGA_COLOR_WHITE);\n    \n    // Halt the system\n    for(;;) {\n        __asm__ volatile(\"hlt\");\n    }\n}"
+      },
+      "irq_handler": {
+        "args": [
+          "irq_number"
+        ],
+        "calls": [
+          "pit_handler",
+          "keyboard_handler",
+          "pic_send_eoi"
+        ],
+        "start_line": 97,
+        "end_line": 113,
+        "code": "void irq_handler(uint64_t irq_number) {\n    // Handle specific IRQs\n    switch (irq_number) {\n        case 0:  // PIT Timer\n            pit_handler();\n            break;\n        case 1:  // Keyboard\n            keyboard_handler();\n            break;\n        // Add more IRQ handlers here as needed\n        default:\n            break;\n    }\n    \n    // Send End of Interrupt to PIC\n    pic_send_eoi(irq_number);\n}"
+      },
+      "interrupts_init": {
+        "args": [],
+        "calls": [
+          "idt_init",
+          "pic_remap",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "idt_set_gate",
+          "enable_interrupts"
+        ],
+        "start_line": 116,
+        "end_line": 178,
+        "code": "void interrupts_init(void) {\n    // Initialize IDT\n    idt_init();\n    \n    // Remap PIC (IRQs 0-15 to interrupts 32-47)\n    pic_remap(0x20, 0x28);\n    \n    // Install ISRs for CPU exceptions (0-31)\n    // Flags: 0x8E = Present, Ring 0, 64-bit Interrupt Gate\n    idt_set_gate(0, (uint64_t)isr0, 0x08, 0x8E);\n    idt_set_gate(1, (uint64_t)isr1, 0x08, 0x8E);\n    idt_set_gate(2, (uint64_t)isr2, 0x08, 0x8E);\n    idt_set_gate(3, (uint64_t)isr3, 0x08, 0x8E);\n    idt_set_gate(4, (uint64_t)isr4, 0x08, 0x8E);\n    idt_set_gate(5, (uint64_t)isr5, 0x08, 0x8E);\n    idt_set_gate(6, (uint64_t)isr6, 0x08, 0x8E);\n    idt_set_gate(7, (uint64_t)isr7, 0x08, 0x8E);\n    idt_set_gate(8, (uint64_t)isr8, 0x08, 0x8E);\n    idt_set_gate(9, (uint64_t)isr9, 0x08, 0x8E);\n    idt_set_gate(10, (uint64_t)isr10, 0x08, 0x8E);\n    idt_set_gate(11, (uint64_t)isr11, 0x08, 0x8E);\n    idt_set_gate(12, (uint64_t)isr12, 0x08, 0x8E);\n    idt_set_gate(13, (uint64_t)isr13, 0x08, 0x8E);\n    idt_set_gate(14, (uint64_t)isr14, 0x08, 0x8E);\n    idt_set_gate(15, (uint64_t)isr15, 0x08, 0x8E);\n    idt_set_gate(16, (uint64_t)isr16, 0x08, 0x8E);\n    idt_set_gate(17, (uint64_t)isr17, 0x08, 0x8E);\n    idt_set_gate(18, (uint64_t)isr18, 0x08, 0x8E);\n    idt_set_gate(19, (uint64_t)isr19, 0x08, 0x8E);\n    idt_set_gate(20, (uint64_t)isr20, 0x08, 0x8E);\n    idt_set_gate(21, (uint64_t)isr21, 0x08, 0x8E);\n    idt_set_gate(22, (uint64_t)isr22, 0x08, 0x8E);\n    idt_set_gate(23, (uint64_t)isr23, 0x08, 0x8E);\n    idt_set_gate(24, (uint64_t)isr24, 0x08, 0x8E);\n    idt_set_gate(25, (uint64_t)isr25, 0x08, 0x8E);\n    idt_set_gate(26, (uint64_t)isr26, 0x08, 0x8E);\n    idt_set_gate(27, (uint64_t)isr27, 0x08, 0x8E);\n    idt_set_gate(28, (uint64_t)isr28, 0x08, 0x8E);\n    idt_set_gate(29, (uint64_t)isr29, 0x08, 0x8E);\n    idt_set_gate(30, (uint64_t)isr30, 0x08, 0x8E);\n    idt_set_gate(31, (uint64_t)isr31, 0x08, 0x8E);\n    \n    // Install IRQ handlers (32-47)\n    idt_set_gate(32, (uint64_t)irq0, 0x08, 0x8E);\n    idt_set_gate(33, (uint64_t)irq1, 0x08, 0x8E);\n    idt_set_gate(34, (uint64_t)irq2, 0x08, 0x8E);\n    idt_set_gate(35, (uint64_t)irq3, 0x08, 0x8E);\n    idt_set_gate(36, (uint64_t)irq4, 0x08, 0x8E);\n    idt_set_gate(37, (uint64_t)irq5, 0x08, 0x8E);\n    idt_set_gate(38, (uint64_t)irq6, 0x08, 0x8E);\n    idt_set_gate(39, (uint64_t)irq7, 0x08, 0x8E);\n    idt_set_gate(40, (uint64_t)irq8, 0x08, 0x8E);\n    idt_set_gate(41, (uint64_t)irq9, 0x08, 0x8E);\n    idt_set_gate(42, (uint64_t)irq10, 0x08, 0x8E);\n    idt_set_gate(43, (uint64_t)irq11, 0x08, 0x8E);\n    idt_set_gate(44, (uint64_t)irq12, 0x08, 0x8E);\n    idt_set_gate(45, (uint64_t)irq13, 0x08, 0x8E);\n    idt_set_gate(46, (uint64_t)irq14, 0x08, 0x8E);\n    idt_set_gate(47, (uint64_t)irq15, 0x08, 0x8E);\n    \n    // Enable interrupts\n    enable_interrupts();\n}"
+      }
+    },
+    "classes": {},
+    "folder": "kernel\\arch\\x86_64",
+    "module": "interrupts"
+  },
+  "repos\\BlitzOS\\kernel\\arch\\x86_64\\interrupts.h": {
+    "file_path": "repos\\BlitzOS\\kernel\\arch\\x86_64\\interrupts.h",
+    "language": "c",
+    "imports": [],
+    "functions": {},
+    "classes": {},
+    "folder": "kernel\\arch\\x86_64",
+    "module": "interrupts"
+  },
+  "repos\\BlitzOS\\kernel\\arch\\x86_64\\isr.asm": {
+    "file_path": "repos\\BlitzOS\\kernel\\arch\\x86_64\\isr.asm",
+    "language": "assembly",
+    "imports": [
+      "isr_handler",
+      "irq_handler",
+      "preempt_handler"
+    ],
+    "functions": {
+      "isr_common_stub": {
+        "args": [],
+        "calls": [
+          "isr_handler"
+        ],
+        "start_line": 92,
+        "end_line": 137,
+        "code": "isr_common_stub:\n    ; Save all registers\n    push rax\n    push rbx\n    push rcx\n    push rdx\n    push rsi\n    push rdi\n    push rbp\n    push r8\n    push r9\n    push r10\n    push r11\n    push r12\n    push r13\n    push r14\n    push r15\n    \n    ; Call C handler (interrupt number is already on stack)\n    mov rdi, [rsp + 120]   ; Get interrupt number (after all pushes)\n    call isr_handler\n    \n    ; Restore all registers\n    pop r15\n    pop r14\n    pop r13\n    pop r12\n    pop r11\n    pop r10\n    pop r9\n    pop r8\n    pop rbp\n    pop rdi\n    pop rsi\n    pop rdx\n    pop rcx\n    pop rbx\n    pop rax\n    \n    ; Clean up error code and interrupt number\n    add rsp, 16\n    \n    ; Return from interrupt\n    iretq\n\n; Common IRQ stub"
+      },
+      "irq_common_stub": {
+        "args": [],
+        "calls": [
+          "preempt_handler",
+          "irq_handler"
+        ],
+        "start_line": 138,
+        "end_line": 197,
+        "code": "irq_common_stub:\n    ; Save all registers\n    push rax\n    push rbx\n    push rcx\n    push rdx\n    push rsi\n    push rdi\n    push rbp\n    push r8\n    push r9\n    push r10\n    push r11\n    push r12\n    push r13\n    push r14\n    push r15\n    \n    ; Get IRQ number\n    mov rdi, [rsp + 120]   ; Get IRQ number (after all pushes)\n    sub rdi, 32             ; Convert to IRQ 0-15\n    \n    ; Check if this is IRQ0 (timer) - special handling for preemption\n    cmp rdi, 0\n    jne .regular_irq\n    \n    ; Timer IRQ - handle preemption\n    mov rdi, rsp           ; Pass current stack pointer\n    call preempt_handler\n    mov rsp, rax           ; Use returned stack pointer (may be different process)\n    jmp .restore_and_return\n    \n.regular_irq:\n    ; Regular IRQ handling  \n    call irq_handler\n    \n.restore_and_return:\n    ; Restore all registers\n    pop r15\n    pop r14\n    pop r13\n    pop r12\n    pop r11\n    pop r10\n    pop r9\n    pop r8\n    pop rbp\n    pop rdi\n    pop rsi\n    pop rdx\n    pop rcx\n    pop rbx\n    pop rax\n    \n    ; Clean up error code and interrupt number\n    add rsp, 16\n    \n    ; Return from interrupt\n    iretq"
+      }
+    },
+    "classes": {},
+    "folder": "kernel\\arch\\x86_64",
+    "module": "isr"
+  },
+  "repos\\BlitzOS\\kernel\\arch\\x86_64\\boot\\boot.asm": {
+    "file_path": "repos\\BlitzOS\\kernel\\arch\\x86_64\\boot\\boot.asm",
+    "language": "assembly",
+    "imports": [
+      "kernel_main"
+    ],
+    "functions": {
+      "multiboot_start": {
+        "args": [],
+        "calls": [],
+        "start_line": 11,
+        "end_line": 20,
+        "code": "multiboot_start:\n    dd MAGIC\n    dd ARCH\n    dd LENGTH\n    dd CHECKSUM\n\n    ; End tag\n    dw 0    ; type\n    dw 0    ; flags\n    dd 8    ; size"
+      },
+      "multiboot_end": {
+        "args": [],
+        "calls": [],
+        "start_line": 21,
+        "end_line": 24,
+        "code": "multiboot_end:\n\nsection .bss\nalign 16"
+      },
+      "stack_bottom": {
+        "args": [],
+        "calls": [],
+        "start_line": 25,
+        "end_line": 26,
+        "code": "stack_bottom:\n    resb 16384  ; 16 KB stack"
+      },
+      "stack_top": {
+        "args": [],
+        "calls": [],
+        "start_line": 27,
+        "end_line": 30,
+        "code": "stack_top:\n\n; Page tables for initial identity mapping\nalign 4096"
+      },
+      "pml4": {
+        "args": [],
+        "calls": [],
+        "start_line": 31,
+        "end_line": 32,
+        "code": "pml4:\n    resb 4096"
+      },
+      "pdpt": {
+        "args": [],
+        "calls": [],
+        "start_line": 33,
+        "end_line": 34,
+        "code": "pdpt:\n    resb 4096"
+      },
+      "pd": {
+        "args": [],
+        "calls": [],
+        "start_line": 35,
+        "end_line": 38,
+        "code": "pd:\n    resb 4096\n\n; Storage for multiboot info"
+      },
+      "multiboot_magic": {
+        "args": [],
+        "calls": [],
+        "start_line": 39,
+        "end_line": 40,
+        "code": "multiboot_magic:\n    resd 1"
+      },
+      "multiboot_addr": {
+        "args": [],
+        "calls": [],
+        "start_line": 41,
+        "end_line": 48,
+        "code": "multiboot_addr:\n    resq 1\n\nsection .text\nbits 32\nglobal _start\nextern kernel_main"
+      },
+      "_start": {
+        "args": [],
+        "calls": [],
+        "start_line": 49,
+        "end_line": 106,
+        "code": "_start:\n    ; GRUB loads us in 32-bit protected mode\n    ; Save multiboot info to memory (not stack)\n    mov [multiboot_magic], eax\n    mov [multiboot_addr], ebx\n    \n    ; Set up stack\n    mov esp, stack_top\n\n    ; Set up page tables for long mode\n    ; Clear page tables\n    mov edi, pml4\n    mov ecx, 3 * 4096 / 4  ; 3 pages\n    xor eax, eax\n    rep stosd\n    \n    ; Set up identity mapping for first 2MB\n    ; PML4[0] -> PDPT\n    mov eax, pdpt\n    or eax, 0x03    ; Present + Writable\n    mov [pml4], eax\n    \n    ; PDPT[0] -> PD\n    mov eax, pd\n    or eax, 0x03\n    mov [pdpt], eax\n    \n    ; PD[0] = 2MB page at 0x0\n    mov eax, 0x83   ; Present + Writable + Huge (2MB page)\n    mov [pd], eax\n\n    ; Load page table\n    mov eax, pml4\n    mov cr3, eax\n\n    ; Enable PAE\n    mov eax, cr4\n    or eax, 1 << 5\n    mov cr4, eax\n\n    ; Enable long mode\n    mov ecx, 0xC0000080\n    rdmsr\n    or eax, 1 << 8\n    wrmsr\n\n    ; Enable paging\n    mov eax, cr0\n    or eax, 1 << 31\n    mov cr0, eax\n\n    ; Load 64-bit GDT\n    lgdt [gdt64.pointer]\n    \n    ; Jump to 64-bit code\n    jmp gdt64.code:long_mode_start\n\nbits 64"
+      },
+      "long_mode_start": {
+        "args": [],
+        "calls": [
+          "kernel_main"
+        ],
+        "start_line": 107,
+        "end_line": 132,
+        "code": "long_mode_start:\n    ; Set up segment registers\n    mov ax, gdt64.data\n    mov ds, ax\n    mov es, ax\n    mov fs, ax\n    mov gs, ax\n    mov ss, ax\n    \n    ; Set up 64-bit stack\n    mov rsp, stack_top\n    \n    ; Load multiboot info from memory\n    mov edi, [multiboot_magic]\n    mov rsi, [multiboot_addr]\n    \n    ; Call kernel\n    call kernel_main\n\n    ; Hang if kernel returns\n    cli\n.hang:\n    hlt\n    jmp .hang\n\nsection .rodata"
+      },
+      "gdt64": {
+        "args": [],
+        "calls": [],
+        "start_line": 133,
+        "end_line": 142,
+        "code": "gdt64:\n    dq 0                        ; Null descriptor\n.code: equ $ - gdt64\n    dq (1<<43) | (1<<44) | (1<<47) | (1<<53)  ; Code segment\n.data: equ $ - gdt64\n    dq (1<<44) | (1<<47) | (1<<41)  ; Data segment\n.pointer:\n    dw $ - gdt64 - 1\n    dq gdt64"
+      }
+    },
+    "classes": {},
+    "folder": "kernel\\arch\\x86_64\\boot",
+    "module": "boot"
+  },
+  "repos\\BlitzOS\\kernel\\boot\\multiboot2.c": {
+    "file_path": "repos\\BlitzOS\\kernel\\boot\\multiboot2.c",
+    "language": "c",
+    "imports": [
+      "multiboot2.h",
+      "../../drivers/vga.h"
+    ],
+    "functions": {
+      "uint64_to_str": {
+        "args": [
+          "num",
+          "* buf"
+        ],
+        "calls": [],
+        "start_line": 10,
+        "end_line": 29,
+        "code": "static void uint64_to_str(uint64_t num, char* buf) {\n    if (num == 0) {\n        buf[0] = '0';\n        buf[1] = '\\0';\n        return;\n    }\n    \n    char temp[32];\n    int i = 0;\n    while (num > 0) {\n        temp[i++] = '0' + (num % 10);\n        num /= 10;\n    }\n    \n    int j = 0;\n    while (i > 0) {\n        buf[j++] = temp[--i];\n    }\n    buf[j] = '\\0';\n}"
+      },
+      "multiboot2_parse": {
+        "args": [
+          "magic",
+          "addr"
+        ],
+        "calls": [
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "uint64_to_str",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "uint64_to_str",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "uint64_to_str",
+          "vga_print",
+          "vga_print",
+          "uint64_to_str",
+          "vga_print",
+          "vga_print",
+          "uint64_to_str",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print"
+        ],
+        "start_line": 32,
+        "end_line": 128,
+        "code": "void multiboot2_parse(uint32_t magic, uint64_t addr) {\n    // Verify magic number\n    if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {\n        vga_print(\"ERROR: Invalid multiboot2 magic!\\n\", VGA_COLOR_LIGHT_RED);\n        return;\n    }\n    \n    vga_print(\"[*] Parsing multiboot2 info...\\n\", VGA_COLOR_BROWN);\n    \n    multiboot_info_t* mbi = (multiboot_info_t*)addr;\n    multiboot_tag_t* tag;\n    \n    // Iterate through all tags\n    for (tag = (multiboot_tag_t*)(addr + 8);\n         tag->type != MULTIBOOT_TAG_TYPE_END;\n         tag = (multiboot_tag_t*)((uint8_t*)tag + ((tag->size + 7) & ~7))) {\n        \n        switch (tag->type) {\n            case MULTIBOOT_TAG_TYPE_CMDLINE:\n                // Command line\n                break;\n                \n            case MULTIBOOT_TAG_TYPE_BOOT_LOADER_NAME:\n                bootloader_tag = (multiboot_tag_string_t*)tag;\n                vga_print(\"    Bootloader: \", VGA_COLOR_WHITE);\n                vga_print(bootloader_tag->string, VGA_COLOR_LIGHT_CYAN);\n                vga_print(\"\\n\", VGA_COLOR_WHITE);\n                break;\n                \n            case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:\n                meminfo_tag = (multiboot_tag_basic_meminfo_t*)tag;\n                {\n                    char buf[32];\n                    vga_print(\"    Lower memory: \", VGA_COLOR_WHITE);\n                    uint64_to_str(meminfo_tag->mem_lower, buf);\n                    vga_print(buf, VGA_COLOR_LIGHT_CYAN);\n                    vga_print(\" KB\\n\", VGA_COLOR_WHITE);\n                    \n                    vga_print(\"    Upper memory: \", VGA_COLOR_WHITE);\n                    uint64_to_str(meminfo_tag->mem_upper, buf);\n                    vga_print(buf, VGA_COLOR_LIGHT_CYAN);\n                    vga_print(\" KB\\n\", VGA_COLOR_WHITE);\n                }\n                break;\n                \n            case MULTIBOOT_TAG_TYPE_MMAP:\n                mmap_tag = (multiboot_tag_mmap_t*)tag;\n                vga_print(\"    Memory map found\\n\", VGA_COLOR_WHITE);\n                \n                // Display memory regions\n                multiboot_mmap_entry_t* entry = mmap_tag->entries;\n                for (; (uint8_t*)entry < (uint8_t*)tag + tag->size;\n                     entry = (multiboot_mmap_entry_t*)((uint64_t)entry + mmap_tag->entry_size)) {\n                    \n                    char buf[32];\n                    vga_print(\"      0x\", VGA_COLOR_WHITE);\n                    \n                    // Print address in hex (simplified)\n                    uint64_to_str(entry->addr, buf);\n                    vga_print(buf, VGA_COLOR_LIGHT_CYAN);\n                    vga_print(\" - 0x\", VGA_COLOR_WHITE);\n                    uint64_to_str(entry->addr + entry->len, buf);\n                    vga_print(buf, VGA_COLOR_LIGHT_CYAN);\n                    \n                    vga_print(\" (\", VGA_COLOR_WHITE);\n                    uint64_to_str(entry->len / 1024, buf);\n                    vga_print(buf, VGA_COLOR_LIGHT_CYAN);\n                    vga_print(\" KB) - \", VGA_COLOR_WHITE);\n                    \n                    switch (entry->type) {\n                        case MULTIBOOT_MEMORY_AVAILABLE:\n                            vga_print(\"Available\", VGA_COLOR_LIGHT_GREEN);\n                            break;\n                        case MULTIBOOT_MEMORY_RESERVED:\n                            vga_print(\"Reserved\", VGA_COLOR_LIGHT_RED);\n                            break;\n                        case MULTIBOOT_MEMORY_ACPI_RECLAIMABLE:\n                            vga_print(\"ACPI Reclaimable\", VGA_COLOR_BROWN);\n                            break;\n                        case MULTIBOOT_MEMORY_NVS:\n                            vga_print(\"ACPI NVS\", VGA_COLOR_BROWN);\n                            break;\n                        case MULTIBOOT_MEMORY_BADRAM:\n                            vga_print(\"Bad RAM\", VGA_COLOR_RED);\n                            break;\n                        default:\n                            vga_print(\"Unknown\", VGA_COLOR_LIGHT_GREY);\n                            break;\n                    }\n                    vga_print(\"\\n\", VGA_COLOR_WHITE);\n                }\n                break;\n        }\n    }\n    \n    vga_print(\"[OK] Multiboot2 info parsed!\\n\", VGA_COLOR_LIGHT_GREEN);\n}"
+      },
+      "multiboot2_get_mmap": {
+        "args": [],
+        "calls": [],
+        "start_line": 131,
+        "end_line": 133,
+        "code": "const multiboot_tag_mmap_t* multiboot2_get_mmap(void) {\n    return mmap_tag;\n}"
+      },
+      "multiboot2_get_basic_meminfo": {
+        "args": [],
+        "calls": [],
+        "start_line": 136,
+        "end_line": 138,
+        "code": "const multiboot_tag_basic_meminfo_t* multiboot2_get_basic_meminfo(void) {\n    return meminfo_tag;\n}"
+      },
+      "multiboot2_get_bootloader_name": {
+        "args": [],
+        "calls": [],
+        "start_line": 141,
+        "end_line": 146,
+        "code": "const char* multiboot2_get_bootloader_name(void) {\n    if (bootloader_tag) {\n        return bootloader_tag->string;\n    }\n    return \"Unknown\";\n}"
+      }
+    },
+    "classes": {},
+    "folder": "kernel\\boot",
+    "module": "multiboot2"
+  },
+  "repos\\BlitzOS\\kernel\\boot\\multiboot2.h": {
+    "file_path": "repos\\BlitzOS\\kernel\\boot\\multiboot2.h",
+    "language": "c",
+    "imports": [],
+    "functions": {},
+    "classes": {},
+    "folder": "kernel\\boot",
+    "module": "multiboot2"
+  },
+  "repos\\BlitzOS\\kernel\\mm\\kheap.c": {
+    "file_path": "repos\\BlitzOS\\kernel\\mm\\kheap.c",
+    "language": "c",
+    "imports": [
+      "kheap.h",
+      "pmm.h",
+      "../../drivers/vga.h",
+      "stdint.h",
+      "stddef.h",
+      "stdbool.h"
+    ],
+    "functions": {
+      "align_up": {
+        "args": [
+          "size",
+          "alignment"
+        ],
+        "calls": [],
+        "start_line": 28,
+        "end_line": 30,
+        "code": "static size_t align_up(size_t size, size_t alignment) {\n    return (size + alignment - 1) & ~(alignment - 1);\n}"
+      },
+      "expand_heap": {
+        "args": [],
+        "calls": [
+          "align_up",
+          "pmm_alloc_page",
+          "KHEAP_PRINT"
+        ],
+        "start_line": 33,
+        "end_line": 82,
+        "code": "static block_header_t* expand_heap(size_t min_size) {\n    size_t expand_size = HEAP_EXPAND_SIZE;\n    if (min_size > expand_size) {\n        // Round up to nearest page boundary\n        expand_size = align_up(min_size, 4096);\n    }\n\n    // Allocate physical pages\n    size_t num_pages = expand_size / 4096;\n    void* new_mem = NULL;\n    \n    for (size_t i = 0; i < num_pages; i++) {\n        void* page = pmm_alloc_page();\n        if (!page) {\n            KHEAP_PRINT(\"[KHEAP] Failed to allocate page for heap expansion\\n\");\n            return NULL;\n        }\n        if (i == 0) {\n            new_mem = page;\n        }\n    }\n\n    if (!new_mem) {\n        return NULL;\n    }\n\n    // Create new block\n    block_header_t* new_block = (block_header_t*)new_mem;\n    new_block->size = expand_size - BLOCK_HEADER_SIZE;\n    new_block->is_free = true;\n    new_block->next = NULL;\n    new_block->prev = NULL;\n\n    total_heap_size += expand_size;\n\n    // Add to linked list\n    if (!heap_start) {\n        heap_start = new_block;\n    } else {\n        // Find last block and append\n        block_header_t* current = heap_start;\n        while (current->next) {\n            current = current->next;\n        }\n        current->next = new_block;\n        new_block->prev = current;\n    }\n\n    return new_block;\n}"
+      },
+      "split_block": {
+        "args": [
+          "* block",
+          "size"
+        ],
+        "calls": [],
+        "start_line": 85,
+        "end_line": 103,
+        "code": "static void split_block(block_header_t* block, size_t size) {\n    // Only split if remaining space is significant\n    if (block->size >= size + BLOCK_HEADER_SIZE + MIN_BLOCK_SIZE) {\n        size_t original_size = block->size;\n        block->size = size;\n\n        // Create new free block from remainder\n        block_header_t* new_block = (block_header_t*)((uint8_t*)block + BLOCK_HEADER_SIZE + size);\n        new_block->size = original_size - size - BLOCK_HEADER_SIZE;\n        new_block->is_free = true;\n        new_block->next = block->next;\n        new_block->prev = block;\n\n        if (block->next) {\n            block->next->prev = new_block;\n        }\n        block->next = new_block;\n    }\n}"
+      },
+      "coalesce_blocks": {
+        "args": [
+          "* block"
+        ],
+        "calls": [],
+        "start_line": 106,
+        "end_line": 124,
+        "code": "static void coalesce_blocks(block_header_t* block) {\n    // Coalesce with next block if it's free\n    if (block->next && block->next->is_free) {\n        block->size += BLOCK_HEADER_SIZE + block->next->size;\n        block->next = block->next->next;\n        if (block->next) {\n            block->next->prev = block;\n        }\n    }\n\n    // Coalesce with previous block if it's free\n    if (block->prev && block->prev->is_free) {\n        block->prev->size += BLOCK_HEADER_SIZE + block->size;\n        block->prev->next = block->next;\n        if (block->next) {\n            block->next->prev = block->prev;\n        }\n    }\n}"
+      },
+      "kheap_init": {
+        "args": [],
+        "calls": [
+          "KHEAP_PRINT",
+          "expand_heap",
+          "KHEAP_PRINT",
+          "KHEAP_PRINT",
+          "vga_print_hex",
+          "KHEAP_PRINT"
+        ],
+        "start_line": 126,
+        "end_line": 140,
+        "code": "void kheap_init(void) {\n    KHEAP_PRINT(\"[KHEAP] Initializing kernel heap...\\n\");\n    \n    // Start with initial heap allocation\n    heap_start = expand_heap(HEAP_EXPAND_SIZE);\n    \n    if (!heap_start) {\n        KHEAP_PRINT(\"[KHEAP] Failed to initialize heap!\\n\");\n        return;\n    }\n    \n    KHEAP_PRINT(\"[KHEAP] Heap initialized with \");\n    vga_print_hex((uint64_t)total_heap_size);\n    KHEAP_PRINT(\" bytes\\n\");\n}"
+      },
+      "kmalloc": {
+        "args": [],
+        "calls": [
+          "align_up",
+          "split_block",
+          "expand_heap",
+          "KHEAP_PRINT",
+          "split_block"
+        ],
+        "start_line": 142,
+        "end_line": 178,
+        "code": "void* kmalloc(size_t size) {\n    if (size == 0) {\n        return NULL;\n    }\n\n    // Align size to 8-byte boundary for performance\n    size = align_up(size, 8);\n\n    // First-fit algorithm: find first free block large enough\n    block_header_t* current = heap_start;\n    while (current) {\n        if (current->is_free && current->size >= size) {\n            // Found suitable block\n            split_block(current, size);\n            current->is_free = false;\n            used_heap_size += size + BLOCK_HEADER_SIZE;\n\n            // Return pointer to usable data (after header)\n            return (void*)((uint8_t*)current + BLOCK_HEADER_SIZE);\n        }\n        current = current->next;\n    }\n\n    // No suitable block found, expand heap\n    block_header_t* new_block = expand_heap(size + BLOCK_HEADER_SIZE);\n    if (!new_block) {\n        KHEAP_PRINT(\"[KHEAP] kmalloc failed: out of memory\\n\");\n        return NULL;\n    }\n\n    // Use the new block\n    split_block(new_block, size);\n    new_block->is_free = false;\n    used_heap_size += size + BLOCK_HEADER_SIZE;\n\n    return (void*)((uint8_t*)new_block + BLOCK_HEADER_SIZE);\n}"
+      },
+      "kmalloc_aligned": {
+        "args": [],
+        "calls": [
+          "kmalloc",
+          "align_up"
+        ],
+        "start_line": 180,
+        "end_line": 200,
+        "code": "void* kmalloc_aligned(size_t size, size_t alignment) {\n    if (alignment == 0 || (alignment & (alignment - 1)) != 0) {\n        // Alignment must be power of 2\n        return NULL;\n    }\n\n    // Allocate extra space for alignment adjustment\n    size_t total_size = size + alignment + BLOCK_HEADER_SIZE;\n    void* ptr = kmalloc(total_size);\n    if (!ptr) {\n        return NULL;\n    }\n\n    // Calculate aligned address\n    uintptr_t addr = (uintptr_t)ptr;\n    uintptr_t aligned_addr = align_up(addr, alignment);\n\n    // For simplicity, just return the allocated pointer\n    // A more sophisticated implementation would track the offset\n    return ptr;\n}"
+      },
+      "kfree": {
+        "args": [
+          "* ptr"
+        ],
+        "calls": [
+          "KHEAP_PRINT",
+          "coalesce_blocks"
+        ],
+        "start_line": 202,
+        "end_line": 221,
+        "code": "void kfree(void* ptr) {\n    if (!ptr) {\n        return;\n    }\n\n    // Get block header (it's right before the data)\n    block_header_t* block = (block_header_t*)((uint8_t*)ptr - BLOCK_HEADER_SIZE);\n\n    if (block->is_free) {\n        KHEAP_PRINT(\"[KHEAP] Warning: Double free detected!\\n\");\n        return;\n    }\n\n    // Mark block as free\n    block->is_free = true;\n    used_heap_size -= block->size + BLOCK_HEADER_SIZE;\n\n    // Coalesce with adjacent free blocks\n    coalesce_blocks(block);\n}"
+      },
+      "kheap_print_stats": {
+        "args": [],
+        "calls": [
+          "KHEAP_PRINT",
+          "KHEAP_PRINT",
+          "vga_print_hex",
+          "KHEAP_PRINT",
+          "KHEAP_PRINT",
+          "vga_print_hex",
+          "KHEAP_PRINT",
+          "KHEAP_PRINT",
+          "vga_print_hex",
+          "KHEAP_PRINT",
+          "KHEAP_PRINT",
+          "vga_print_hex",
+          "KHEAP_PRINT",
+          "KHEAP_PRINT",
+          "vga_print_hex",
+          "KHEAP_PRINT"
+        ],
+        "start_line": 223,
+        "end_line": 254,
+        "code": "void kheap_print_stats(void) {\n    KHEAP_PRINT(\"[KHEAP] Heap Statistics:\\n\");\n    KHEAP_PRINT(\"  Total heap size: \");\n    vga_print_hex((uint64_t)total_heap_size);\n    KHEAP_PRINT(\" bytes\\n\");\n    KHEAP_PRINT(\"  Used heap size:  \");\n    vga_print_hex((uint64_t)used_heap_size);\n    KHEAP_PRINT(\" bytes\\n\");\n    KHEAP_PRINT(\"  Free heap size:  \");\n    vga_print_hex((uint64_t)(total_heap_size - used_heap_size));\n    KHEAP_PRINT(\" bytes\\n\");\n\n    // Count blocks\n    size_t free_blocks = 0;\n    size_t used_blocks = 0;\n    block_header_t* current = heap_start;\n    while (current) {\n        if (current->is_free) {\n            free_blocks++;\n        } else {\n            used_blocks++;\n        }\n        current = current->next;\n    }\n\n    KHEAP_PRINT(\"  Free blocks: \");\n    vga_print_hex((uint64_t)free_blocks);\n    KHEAP_PRINT(\"\\n\");\n    KHEAP_PRINT(\"  Used blocks: \");\n    vga_print_hex((uint64_t)used_blocks);\n    KHEAP_PRINT(\"\\n\");\n}"
+      }
+    },
+    "classes": {
+      "block_header": {
+        "inherits": [],
+        "methods": {}
+      }
+    },
+    "folder": "kernel\\mm",
+    "module": "kheap"
+  },
+  "repos\\BlitzOS\\kernel\\mm\\kheap.h": {
+    "file_path": "repos\\BlitzOS\\kernel\\mm\\kheap.h",
+    "language": "c",
+    "imports": [],
+    "functions": {},
+    "classes": {},
+    "folder": "kernel\\mm",
+    "module": "kheap"
+  },
+  "repos\\BlitzOS\\kernel\\mm\\paging.c": {
+    "file_path": "repos\\BlitzOS\\kernel\\mm\\paging.c",
+    "language": "c",
+    "imports": [
+      "paging.h",
+      "pmm.h",
+      "../../drivers/vga.h",
+      "stddef.h"
+    ],
+    "functions": {
+      "pml4_index": {
+        "args": [
+          "virt"
+        ],
+        "calls": [],
+        "start_line": 10,
+        "end_line": 10,
+        "code": "static inline uint64_t pml4_index(uint64_t virt) { return (virt >> 39) & 0x1FF; }"
+      },
+      "pdpt_index": {
+        "args": [
+          "virt"
+        ],
+        "calls": [],
+        "start_line": 11,
+        "end_line": 11,
+        "code": "static inline uint64_t pdpt_index(uint64_t virt) { return (virt >> 30) & 0x1FF; }"
+      },
+      "pd_index": {
+        "args": [
+          "virt"
+        ],
+        "calls": [],
+        "start_line": 12,
+        "end_line": 12,
+        "code": "static inline uint64_t pd_index(uint64_t virt)   { return (virt >> 21) & 0x1FF; }"
+      },
+      "pt_index": {
+        "args": [
+          "virt"
+        ],
+        "calls": [],
+        "start_line": 13,
+        "end_line": 13,
+        "code": "static inline uint64_t pt_index(uint64_t virt)   { return (virt >> 12) & 0x1FF; }"
+      },
+      "uint64_to_str": {
+        "args": [
+          "num",
+          "* buf"
+        ],
+        "calls": [],
+        "start_line": 16,
+        "end_line": 33,
+        "code": "static void uint64_to_str(uint64_t num, char* buf) {\n    if (num == 0) {\n        buf[0] = '0';\n        buf[1] = '\\0';\n        return;\n    }\n    char temp[32];\n    int i = 0;\n    while (num > 0) {\n        temp[i++] = '0' + (num % 10);\n        num /= 10;\n    }\n    int j = 0;\n    while (i > 0) {\n        buf[j++] = temp[--i];\n    }\n    buf[j] = '\\0';\n}"
+      },
+      "get_or_create_table": {
+        "args": [],
+        "calls": [
+          "pmm_alloc_page"
+        ],
+        "start_line": 36,
+        "end_line": 57,
+        "code": "static page_table_t* get_or_create_table(pte_t* entry, uint64_t flags) {\n    if (*entry & PAGE_PRESENT) {\n        // Table exists, return its address\n        return (page_table_t*)(*entry & ~0xFFF);\n    }\n    \n    // Allocate new table\n    page_table_t* table = (page_table_t*)pmm_alloc_page();\n    if (!table) {\n        return NULL; // Out of memory\n    }\n    \n    // Clear the table\n    for (int i = 0; i < 512; i++) {\n        table->entries[i] = 0;\n    }\n    \n    // Set entry to point to new table\n    *entry = (uint64_t)table | flags | PAGE_PRESENT | PAGE_WRITABLE;\n    \n    return table;\n}"
+      },
+      "paging_init": {
+        "args": [],
+        "calls": [
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print"
+        ],
+        "start_line": 60,
+        "end_line": 82,
+        "code": "void paging_init(void) {\n    vga_print(\"[*] Initializing paging...\\n\", VGA_COLOR_BROWN);\n    \n    // Get current PML4 from CR3 (set up by boot.asm)\n    uint64_t cr3;\n    __asm__ volatile(\"mov %%cr3, %0\" : \"=r\"(cr3));\n    kernel_pml4 = (page_table_t*)cr3;\n    \n    vga_print(\"    Using boot page tables at 0x\", VGA_COLOR_WHITE);\n    char hex[17];\n    for (int j = 15; j >= 0; j--) {\n        uint8_t nibble = (cr3 >> (j * 4)) & 0xF;\n        hex[15 - j] = nibble < 10 ? '0' + nibble : 'a' + nibble - 10;\n    }\n    hex[16] = '\\0';\n    vga_print(hex, VGA_COLOR_LIGHT_CYAN);\n    vga_print(\"\\n\", VGA_COLOR_WHITE);\n    \n    vga_print(\"    Paging already enabled by bootloader\\n\", VGA_COLOR_WHITE);\n    vga_print(\"    First 2 MB identity mapped\\n\", VGA_COLOR_WHITE);\n    \n    vga_print(\"[OK] Paging initialized!\\n\", VGA_COLOR_LIGHT_GREEN);\n}"
+      },
+      "paging_map_page": {
+        "args": [
+          "virt",
+          "phys",
+          "flags"
+        ],
+        "calls": [
+          "pml4_index",
+          "pdpt_index",
+          "pd_index",
+          "pt_index",
+          "get_or_create_table",
+          "get_or_create_table",
+          "get_or_create_table"
+        ],
+        "start_line": 85,
+        "end_line": 106,
+        "code": "void paging_map_page(uint64_t virt, uint64_t phys, uint64_t flags) {\n    // Get indices for all levels\n    uint64_t pml4_idx = pml4_index(virt);\n    uint64_t pdpt_idx = pdpt_index(virt);\n    uint64_t pd_idx = pd_index(virt);\n    uint64_t pt_idx = pt_index(virt);\n    \n    // Get or create PDPT\n    page_table_t* pdpt = get_or_create_table(&kernel_pml4->entries[pml4_idx], PAGE_USER);\n    if (!pdpt) return;\n    \n    // Get or create PD\n    page_table_t* pd = get_or_create_table(&pdpt->entries[pdpt_idx], PAGE_USER);\n    if (!pd) return;\n    \n    // Get or create PT\n    page_table_t* pt = get_or_create_table(&pd->entries[pd_idx], PAGE_USER);\n    if (!pt) return;\n    \n    // Map page\n    pt->entries[pt_idx] = (phys & ~0xFFF) | flags;\n}"
+      },
+      "paging_unmap_page": {
+        "args": [
+          "virt"
+        ],
+        "calls": [
+          "pml4_index",
+          "pdpt_index",
+          "pd_index",
+          "pt_index"
+        ],
+        "start_line": 109,
+        "end_line": 132,
+        "code": "void paging_unmap_page(uint64_t virt) {\n    uint64_t pml4_idx = pml4_index(virt);\n    uint64_t pdpt_idx = pdpt_index(virt);\n    uint64_t pd_idx = pd_index(virt);\n    uint64_t pt_idx = pt_index(virt);\n    \n    // Check if PML4 entry exists\n    if (!(kernel_pml4->entries[pml4_idx] & PAGE_PRESENT)) return;\n    page_table_t* pdpt = (page_table_t*)(kernel_pml4->entries[pml4_idx] & ~0xFFF);\n    \n    // Check if PDPT entry exists\n    if (!(pdpt->entries[pdpt_idx] & PAGE_PRESENT)) return;\n    page_table_t* pd = (page_table_t*)(pdpt->entries[pdpt_idx] & ~0xFFF);\n    \n    // Check if PD entry exists\n    if (!(pd->entries[pd_idx] & PAGE_PRESENT)) return;\n    page_table_t* pt = (page_table_t*)(pd->entries[pd_idx] & ~0xFFF);\n    \n    // Unmap page\n    pt->entries[pt_idx] = 0;\n    \n    // Invalidate TLB entry\n    __asm__ volatile(\"invlpg (%0)\" :: \"r\"(virt) : \"memory\");\n}"
+      },
+      "paging_get_physical": {
+        "args": [
+          "virt"
+        ],
+        "calls": [
+          "pml4_index",
+          "pdpt_index",
+          "pd_index",
+          "pt_index"
+        ],
+        "start_line": 135,
+        "end_line": 153,
+        "code": "uint64_t paging_get_physical(uint64_t virt) {\n    uint64_t pml4_idx = pml4_index(virt);\n    uint64_t pdpt_idx = pdpt_index(virt);\n    uint64_t pd_idx = pd_index(virt);\n    uint64_t pt_idx = pt_index(virt);\n    \n    if (!(kernel_pml4->entries[pml4_idx] & PAGE_PRESENT)) return 0;\n    page_table_t* pdpt = (page_table_t*)(kernel_pml4->entries[pml4_idx] & ~0xFFF);\n    \n    if (!(pdpt->entries[pdpt_idx] & PAGE_PRESENT)) return 0;\n    page_table_t* pd = (page_table_t*)(pdpt->entries[pdpt_idx] & ~0xFFF);\n    \n    if (!(pd->entries[pd_idx] & PAGE_PRESENT)) return 0;\n    page_table_t* pt = (page_table_t*)(pd->entries[pd_idx] & ~0xFFF);\n    \n    if (!(pt->entries[pt_idx] & PAGE_PRESENT)) return 0;\n    \n    return (pt->entries[pt_idx] & ~0xFFF) | (virt & 0xFFF);\n}"
+      },
+      "paging_switch_directory": {
+        "args": [
+          "* pml4"
+        ],
+        "calls": [],
+        "start_line": 156,
+        "end_line": 159,
+        "code": "void paging_switch_directory(page_table_t* pml4) {\n    kernel_pml4 = pml4;\n    __asm__ volatile(\"mov %0, %%cr3\" :: \"r\"(pml4) : \"memory\");\n}"
+      },
+      "paging_get_current_directory": {
+        "args": [],
+        "calls": [],
+        "start_line": 162,
+        "end_line": 164,
+        "code": "page_table_t* paging_get_current_directory(void) {\n    return kernel_pml4;\n}"
+      },
+      "paging_create_address_space": {
+        "args": [],
+        "calls": [
+          "pmm_alloc_page"
+        ],
+        "start_line": 167,
+        "end_line": 182,
+        "code": "page_table_t* paging_create_address_space(void) {\n    page_table_t* pml4 = (page_table_t*)pmm_alloc_page();\n    if (!pml4) return NULL;\n    \n    // Clear PML4\n    for (int i = 0; i < 512; i++) {\n        pml4->entries[i] = 0;\n    }\n    \n    // Copy kernel mappings (top half)\n    for (int i = 256; i < 512; i++) {\n        pml4->entries[i] = kernel_pml4->entries[i];\n    }\n    \n    return pml4;\n}"
+      }
+    },
+    "classes": {},
+    "folder": "kernel\\mm",
+    "module": "paging"
+  },
+  "repos\\BlitzOS\\kernel\\mm\\paging.h": {
+    "file_path": "repos\\BlitzOS\\kernel\\mm\\paging.h",
+    "language": "c",
+    "imports": [],
+    "functions": {},
+    "classes": {},
+    "folder": "kernel\\mm",
+    "module": "paging"
+  },
+  "repos\\BlitzOS\\kernel\\mm\\pmm.c": {
+    "file_path": "repos\\BlitzOS\\kernel\\mm\\pmm.c",
+    "language": "c",
+    "imports": [
+      "pmm.h",
+      "../boot/multiboot2.h",
+      "../../drivers/vga.h"
+    ],
+    "functions": {
+      "bitmap_set": {
+        "args": [
+          "bit"
+        ],
+        "calls": [],
+        "start_line": 17,
+        "end_line": 19,
+        "code": "static inline void bitmap_set(uint64_t bit) {\n    bitmap[bit / 8] |= (1 << (bit % 8));\n}"
+      },
+      "bitmap_clear": {
+        "args": [
+          "bit"
+        ],
+        "calls": [],
+        "start_line": 21,
+        "end_line": 23,
+        "code": "static inline void bitmap_clear(uint64_t bit) {\n    bitmap[bit / 8] &= ~(1 << (bit % 8));\n}"
+      },
+      "bitmap_test": {
+        "args": [
+          "bit"
+        ],
+        "calls": [],
+        "start_line": 25,
+        "end_line": 27,
+        "code": "static inline int bitmap_test(uint64_t bit) {\n    return bitmap[bit / 8] & (1 << (bit % 8));\n}"
+      },
+      "uint64_to_str_dec": {
+        "args": [
+          "num",
+          "* buf"
+        ],
+        "calls": [],
+        "start_line": 30,
+        "end_line": 49,
+        "code": "static void uint64_to_str_dec(uint64_t num, char* buf) {\n    if (num == 0) {\n        buf[0] = '0';\n        buf[1] = '\\0';\n        return;\n    }\n    \n    char temp[32];\n    int i = 0;\n    while (num > 0) {\n        temp[i++] = '0' + (num % 10);\n        num /= 10;\n    }\n    \n    int j = 0;\n    while (i > 0) {\n        buf[j++] = temp[--i];\n    }\n    buf[j] = '\\0';\n}"
+      },
+      "pmm_init": {
+        "args": [],
+        "calls": [
+          "vga_print",
+          "multiboot2_get_mmap",
+          "vga_print",
+          "bitmap_test",
+          "bitmap_clear",
+          "bitmap_test",
+          "bitmap_set",
+          "vga_print",
+          "uint64_to_str_dec",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "uint64_to_str_dec",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "uint64_to_str_dec",
+          "vga_print",
+          "vga_print",
+          "vga_print"
+        ],
+        "start_line": 52,
+        "end_line": 141,
+        "code": "void pmm_init(void) {\n    vga_print(\"[*] Initializing physical memory manager...\\n\", VGA_COLOR_BROWN);\n    \n    // Get memory map from multiboot\n    const multiboot_tag_mmap_t* mmap = multiboot2_get_mmap();\n    if (!mmap) {\n        vga_print(\"[ERROR] No memory map available!\\n\", VGA_COLOR_LIGHT_RED);\n        return;\n    }\n    \n    // Find the largest available memory region\n    uint64_t max_addr = 0;\n    const multiboot_mmap_entry_t* entry = mmap->entries;\n    \n    for (; (uint8_t*)entry < (uint8_t*)mmap + mmap->size;\n         entry = (multiboot_mmap_entry_t*)((uint64_t)entry + mmap->entry_size)) {\n        \n        if (entry->type == MULTIBOOT_MEMORY_AVAILABLE) {\n            uint64_t end = entry->addr + entry->len;\n            if (end > max_addr) {\n                max_addr = end;\n            }\n            memory_size += entry->len;\n        }\n    }\n    \n    // Calculate number of pages\n    total_pages = max_addr / PAGE_SIZE;\n    \n    // Calculate bitmap size (1 bit per page)\n    uint64_t bitmap_size = (total_pages + 7) / 8;\n    \n    // Place bitmap after kernel\n    bitmap = (uint8_t*)((uint64_t)&kernel_end);\n    \n    // Initialize bitmap - mark all as used initially\n    for (uint64_t i = 0; i < bitmap_size; i++) {\n        bitmap[i] = 0xFF;\n    }\n    used_pages = total_pages;\n    \n    // Mark available regions as free\n    entry = mmap->entries;\n    for (; (uint8_t*)entry < (uint8_t*)mmap + mmap->size;\n         entry = (multiboot_mmap_entry_t*)((uint64_t)entry + mmap->entry_size)) {\n        \n        if (entry->type == MULTIBOOT_MEMORY_AVAILABLE) {\n            uint64_t start_page = entry->addr / PAGE_SIZE;\n            uint64_t num_pages = entry->len / PAGE_SIZE;\n            \n            for (uint64_t i = 0; i < num_pages; i++) {\n                if (!bitmap_test(start_page + i)) {\n                    continue;\n                }\n                bitmap_clear(start_page + i);\n                used_pages--;\n            }\n        }\n    }\n    \n    // Reserve kernel and bitmap\n    uint64_t kernel_start = 0x100000; // 1 MB (where kernel is loaded)\n    uint64_t kernel_pages = ((uint64_t)&kernel_end - kernel_start + PAGE_SIZE - 1) / PAGE_SIZE;\n    uint64_t bitmap_pages = (bitmap_size + PAGE_SIZE - 1) / PAGE_SIZE;\n    \n    for (uint64_t i = kernel_start / PAGE_SIZE; i < (kernel_start / PAGE_SIZE + kernel_pages + bitmap_pages); i++) {\n        if (i < total_pages && !bitmap_test(i)) {\n            bitmap_set(i);\n            used_pages++;\n        }\n    }\n    \n    char buf[32];\n    vga_print(\"    Total memory: \", VGA_COLOR_WHITE);\n    uint64_to_str_dec(memory_size / 1024 / 1024, buf);\n    vga_print(buf, VGA_COLOR_LIGHT_CYAN);\n    vga_print(\" MB\\n\", VGA_COLOR_WHITE);\n    \n    vga_print(\"    Total pages: \", VGA_COLOR_WHITE);\n    uint64_to_str_dec(total_pages, buf);\n    vga_print(buf, VGA_COLOR_LIGHT_CYAN);\n    vga_print(\"\\n\", VGA_COLOR_WHITE);\n    \n    vga_print(\"    Free pages: \", VGA_COLOR_WHITE);\n    uint64_to_str_dec(total_pages - used_pages, buf);\n    vga_print(buf, VGA_COLOR_LIGHT_CYAN);\n    vga_print(\"\\n\", VGA_COLOR_WHITE);\n    \n    vga_print(\"[OK] PMM initialized!\\n\", VGA_COLOR_LIGHT_GREEN);\n}"
+      },
+      "pmm_alloc_page": {
+        "args": [],
+        "calls": [
+          "bitmap_test",
+          "bitmap_set"
+        ],
+        "start_line": 144,
+        "end_line": 156,
+        "code": "void* pmm_alloc_page(void) {\n    // Find first free page\n    for (uint64_t i = 0; i < total_pages; i++) {\n        if (!bitmap_test(i)) {\n            bitmap_set(i);\n            used_pages++;\n            return (void*)(i * PAGE_SIZE);\n        }\n    }\n    \n    // Out of memory\n    return 0;\n}"
+      },
+      "pmm_free_page": {
+        "args": [
+          "* page"
+        ],
+        "calls": [
+          "bitmap_test",
+          "bitmap_clear"
+        ],
+        "start_line": 159,
+        "end_line": 172,
+        "code": "void pmm_free_page(void* page) {\n    uint64_t pfn = (uint64_t)page / PAGE_SIZE;\n    \n    if (pfn >= total_pages) {\n        return; // Invalid page\n    }\n    \n    if (!bitmap_test(pfn)) {\n        return; // Already free\n    }\n    \n    bitmap_clear(pfn);\n    used_pages--;\n}"
+      },
+      "pmm_get_total_memory": {
+        "args": [],
+        "calls": [],
+        "start_line": 175,
+        "end_line": 177,
+        "code": "uint64_t pmm_get_total_memory(void) {\n    return total_pages * PAGE_SIZE;\n}"
+      },
+      "pmm_get_free_memory": {
+        "args": [],
+        "calls": [],
+        "start_line": 180,
+        "end_line": 182,
+        "code": "uint64_t pmm_get_free_memory(void) {\n    return (total_pages - used_pages) * PAGE_SIZE;\n}"
+      },
+      "pmm_get_used_memory": {
+        "args": [],
+        "calls": [],
+        "start_line": 185,
+        "end_line": 187,
+        "code": "uint64_t pmm_get_used_memory(void) {\n    return used_pages * PAGE_SIZE;\n}"
+      }
+    },
+    "classes": {},
+    "folder": "kernel\\mm",
+    "module": "pmm"
+  },
+  "repos\\BlitzOS\\kernel\\mm\\pmm.h": {
+    "file_path": "repos\\BlitzOS\\kernel\\mm\\pmm.h",
+    "language": "c",
+    "imports": [],
+    "functions": {},
+    "classes": {},
+    "folder": "kernel\\mm",
+    "module": "pmm"
+  },
+  "repos\\BlitzOS\\kernel\\proc\\process.c": {
+    "file_path": "repos\\BlitzOS\\kernel\\proc\\process.c",
+    "language": "c",
+    "imports": [
+      "process.h",
+      "../../drivers/vga.h",
+      "../mm/kheap.h"
+    ],
+    "functions": {
+      "outb": {
+        "args": [
+          "port",
+          "value"
+        ],
+        "calls": [],
+        "start_line": 6,
+        "end_line": 8,
+        "code": "static inline void outb(uint16_t port, uint8_t value) {\n    __asm__ volatile (\"outb %0, %1\" : : \"a\"(value), \"Nd\"(port));\n}"
+      },
+      "strncpy_safe": {
+        "args": [
+          "* dest",
+          "* src",
+          "n"
+        ],
+        "calls": [],
+        "start_line": 11,
+        "end_line": 17,
+        "code": "static inline void strncpy_safe(char* dest, const char* src, size_t n)\n{\n    for (size_t i = 0; i < n && src[i] != '\\0'; i++) {\n        dest[i] = src[i];\n    }\n    dest[n-1] = '\\0';\n}"
+      },
+      "snprintf_safe": {
+        "args": [
+          "* buf",
+          "size",
+          "* fmt",
+          "val"
+        ],
+        "calls": [],
+        "start_line": 19,
+        "end_line": 50,
+        "code": "static inline int snprintf_safe(char* buf, size_t size, const char* fmt, uint32_t val)\n{\n    // Simple version: just handles \"proc_%u\"\n    const char prefix[] = \"proc_\";\n    const char* p = prefix;\n    size_t i = 0;\n    \n    while (i < size - 1 && *p) {\n        buf[i++] = *p++;\n    }\n    \n    // Convert number to string\n    uint32_t digits[10];\n    int digit_count = 0;\n    uint32_t temp = val;\n    \n    if (temp == 0) {\n        digits[digit_count++] = 0;\n    } else {\n        while (temp > 0) {\n            digits[digit_count++] = temp % 10;\n            temp /= 10;\n        }\n    }\n    \n    for (int j = digit_count - 1; j >= 0 && i < size - 1; j--) {\n        buf[i++] = '0' + digits[j];\n    }\n    \n    buf[i] = '\\0';\n    return i;\n}"
+      },
+      "scheduler_init": {
+        "args": [],
+        "calls": [
+          "vga_print",
+          "vga_print"
+        ],
+        "start_line": 62,
+        "end_line": 73,
+        "code": "void scheduler_init(void)\n{\n    scheduler.ready_queue_head = NULL;\n    scheduler.ready_queue_tail = NULL;\n    scheduler.current_process = NULL;\n    scheduler.next_pid = 1;  // PID 0 reserved for idle\n    scheduler.process_count = 0;\n    scheduler.total_ticks = 0;\n    \n    vga_print(\"[SCHED] Scheduler initialized\", VGA_COLOR_LIGHT_GREEN);\n    vga_print(\"\\n\", VGA_COLOR_WHITE);\n}"
+      },
+      "queue_enqueue": {
+        "args": [
+          "* proc"
+        ],
+        "calls": [],
+        "start_line": 78,
+        "end_line": 95,
+        "code": "static void queue_enqueue(process_t* proc)\n{\n    if (!proc) return;\n    \n    proc->next = NULL;\n    \n    if (scheduler.ready_queue_tail == NULL) {\n        // Queue is empty\n        scheduler.ready_queue_head = proc;\n        scheduler.ready_queue_tail = proc;\n        proc->prev = NULL;\n    } else {\n        // Add to end\n        proc->prev = scheduler.ready_queue_tail;\n        scheduler.ready_queue_tail->next = proc;\n        scheduler.ready_queue_tail = proc;\n    }\n}"
+      },
+      "queue_dequeue": {
+        "args": [],
+        "calls": [],
+        "start_line": 100,
+        "end_line": 119,
+        "code": "static process_t* queue_dequeue(void)\n{\n    if (scheduler.ready_queue_head == NULL) {\n        return NULL;\n    }\n    \n    process_t* proc = scheduler.ready_queue_head;\n    scheduler.ready_queue_head = proc->next;\n    \n    if (scheduler.ready_queue_head == NULL) {\n        scheduler.ready_queue_tail = NULL;\n    } else {\n        scheduler.ready_queue_head->prev = NULL;\n    }\n    \n    proc->next = NULL;\n    proc->prev = NULL;\n    \n    return proc;\n}"
+      },
+      "process_create": {
+        "args": [],
+        "calls": [
+          "vga_print",
+          "vga_print",
+          "kmalloc",
+          "vga_print",
+          "vga_print",
+          "strncpy_safe",
+          "snprintf_safe",
+          "kmalloc",
+          "kfree",
+          "vga_print",
+          "vga_print",
+          "kmalloc",
+          "kfree",
+          "kfree",
+          "vga_print",
+          "vga_print",
+          "queue_enqueue",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print_int",
+          "vga_print",
+          "vga_print"
+        ],
+        "start_line": 125,
+        "end_line": 231,
+        "code": "process_t* process_create(const char* name, void (*entry)(void), uint32_t priority)\n{\n    if (scheduler.process_count >= MAX_PROCESSES) {\n        vga_print(\"[ERR] Max processes reached\", VGA_COLOR_LIGHT_RED);\n        vga_print(\"\\n\", VGA_COLOR_WHITE);\n        return NULL;\n    }\n    \n    // Allocate process structure\n    process_t* proc = (process_t*)kmalloc(sizeof(process_t));\n    if (!proc) {\n        vga_print(\"[ERR] Failed to allocate process\", VGA_COLOR_LIGHT_RED);\n        vga_print(\"\\n\", VGA_COLOR_WHITE);\n        return NULL;\n    }\n    \n    // Initialize process fields\n    proc->pid = scheduler.next_pid++;\n    proc->parent_pid = scheduler.current_process ? scheduler.current_process->pid : 0;\n    \n    if (name) {\n        strncpy_safe(proc->name, name, sizeof(proc->name));\n    } else {\n        snprintf_safe(proc->name, sizeof(proc->name), \"proc_%u\", proc->pid);\n    }\n    \n    // State\n    proc->state = PROCESS_READY;\n    proc->priority = priority;\n    proc->time_slice_remaining = TIME_SLICE_TICKS;\n    proc->total_ticks = 0;\n    proc->wake_time = 0;\n    \n    // Allocate stacks\n    proc->kernel_stack = kmalloc(PROCESS_STACK_SIZE);\n    if (!proc->kernel_stack) {\n        kfree(proc);\n        vga_print(\"[ERR] Failed to allocate kernel stack\", VGA_COLOR_LIGHT_RED);\n        vga_print(\"\\n\", VGA_COLOR_WHITE);\n        return NULL;\n    }\n    \n    proc->user_stack = kmalloc(PROCESS_STACK_SIZE);\n    if (!proc->user_stack) {\n        kfree(proc->kernel_stack);\n        kfree(proc);\n        vga_print(\"[ERR] Failed to allocate user stack\", VGA_COLOR_LIGHT_RED);\n        vga_print(\"\\n\", VGA_COLOR_WHITE);\n        return NULL;\n    }\n    \n    // Initialize stack pointers to top of stacks\n    proc->kernel_stack_top = (void*)((uint64_t)proc->kernel_stack + PROCESS_STACK_SIZE);\n    \n    // Set up initial stack frame for interrupt return\n    // When preempt_handler returns this stack pointer, iretq will pop:\n    // SS, RSP, RFLAGS, CS, RIP (in that order)\n    uint64_t* stack = (uint64_t*)proc->kernel_stack_top;\n    \n    // Build stack frame (working backwards from top)\n    stack--;  *stack = 0x10;           // SS (data segment)\n    stack--;  *stack = (uint64_t)proc->kernel_stack_top;  // RSP\n    stack--;  *stack = 0x202;          // RFLAGS (IF=1, interrupts enabled)\n    stack--;  *stack = 0x08;           // CS (code segment)\n    stack--;  *stack = (uint64_t)entry;  // RIP (entry point)\n    \n    // Build register save frame (what irq_common_stub pushes)\n    stack--;  *stack = 0;  // Interrupt number (dummy)\n    stack--;  *stack = 0;  // Error code (dummy)\n    stack--;  *stack = 0;  // RAX\n    stack--;  *stack = 0;  // RBX\n    stack--;  *stack = 0;  // RCX\n    stack--;  *stack = 0;  // RDX\n    stack--;  *stack = 0;  // RSI\n    stack--;  *stack = 0;  // RDI\n    stack--;  *stack = 0;  // RBP\n    stack--;  *stack = 0;  // R8\n    stack--;  *stack = 0;  // R9\n    stack--;  *stack = 0;  // R10\n    stack--;  *stack = 0;  // R11\n    stack--;  *stack = 0;  // R12\n    stack--;  *stack = 0;  // R13\n    stack--;  *stack = 0;  // R14\n    stack--;  *stack = 0;  // R15\n    \n    // Store stack pointer (points to R15 position)\n    proc->registers.rsp = (uint64_t)stack;\n    proc->registers.rbp = (uint64_t)proc->kernel_stack_top;\n    proc->registers.rip = (uint64_t)entry;\n    proc->registers.rflags = 0x202;  // Enable interrupts (IF flag)\n    \n    // Page table (for now, use kernel's - no isolation yet)\n    proc->page_table = NULL;  // NULL means use kernel page table\n    \n    // Add to ready queue\n    queue_enqueue(proc);\n    scheduler.process_count++;\n    \n    vga_print(\"[SCHED] Created process: \", VGA_COLOR_LIGHT_CYAN);\n    vga_print(proc->name, VGA_COLOR_LIGHT_CYAN);\n    vga_print(\" (PID: \", VGA_COLOR_LIGHT_CYAN);\n    vga_print_int(proc->pid, VGA_COLOR_LIGHT_CYAN);\n    vga_print(\")\", VGA_COLOR_LIGHT_CYAN);\n    vga_print(\"\\n\", VGA_COLOR_WHITE);\n    \n    return proc;\n}"
+      },
+      "process_kill": {
+        "args": [
+          "* proc"
+        ],
+        "calls": [
+          "kfree",
+          "kfree",
+          "kfree"
+        ],
+        "start_line": 236,
+        "end_line": 254,
+        "code": "void process_kill(process_t* proc)\n{\n    if (!proc) return;\n    \n    proc->state = PROCESS_TERMINATED;\n    \n    // Remove from ready queue if there\n    if (proc->prev) proc->prev->next = proc->next;\n    if (proc->next) proc->next->prev = proc->prev;\n    if (scheduler.ready_queue_head == proc) scheduler.ready_queue_head = proc->next;\n    if (scheduler.ready_queue_tail == proc) scheduler.ready_queue_tail = proc->prev;\n    \n    // Free resources\n    if (proc->kernel_stack) kfree(proc->kernel_stack);\n    if (proc->user_stack) kfree(proc->user_stack);\n    kfree(proc);\n    \n    scheduler.process_count--;\n}"
+      },
+      "get_current_process": {
+        "args": [],
+        "calls": [],
+        "start_line": 259,
+        "end_line": 262,
+        "code": "process_t* get_current_process(void)\n{\n    return scheduler.current_process;\n}"
+      },
+      "scheduler_pick_next": {
+        "args": [],
+        "calls": [
+          "queue_enqueue",
+          "queue_dequeue",
+          "vga_print",
+          "vga_print"
+        ],
+        "start_line": 267,
+        "end_line": 296,
+        "code": "process_t* scheduler_pick_next(void)\n{\n    // If current process is still running and has time left\n    if (scheduler.current_process != NULL &&\n        scheduler.current_process->state == PROCESS_RUNNING &&\n        scheduler.current_process->time_slice_remaining > 0) {\n        return scheduler.current_process;  // Keep current process\n    }\n    \n    // Current process needs to wait or is done\n    if (scheduler.current_process != NULL) {\n        scheduler.current_process->state = PROCESS_READY;\n        queue_enqueue(scheduler.current_process);\n    }\n    \n    // Get next ready process\n    process_t* next = queue_dequeue();\n    \n    if (next == NULL) {\n        // No processes ready - this shouldn't happen\n        vga_print(\"[ERR] No processes ready!\", VGA_COLOR_LIGHT_RED);\n        vga_print(\"\\n\", VGA_COLOR_WHITE);\n        return NULL;\n    }\n    \n    next->state = PROCESS_RUNNING;\n    next->time_slice_remaining = TIME_SLICE_TICKS;\n    \n    return next;\n}"
+      },
+      "scheduler_tick": {
+        "args": [],
+        "calls": [],
+        "start_line": 301,
+        "end_line": 314,
+        "code": "void scheduler_tick(void)\n{\n    scheduler.total_ticks++;\n    \n    if (scheduler.current_process) {\n        scheduler.current_process->total_ticks++;\n        scheduler.current_process->time_slice_remaining--;\n        \n        // Time quantum expired?\n        if (scheduler.current_process->time_slice_remaining == 0) {\n            need_reschedule = 1;\n        }\n    }\n}"
+      },
+      "preempt_handler": {
+        "args": [
+          "stack_ptr"
+        ],
+        "calls": [
+          "outb",
+          "vga_print",
+          "vga_print_int",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print_int",
+          "vga_print",
+          "vga_print_int",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print_int",
+          "vga_print",
+          "vga_print_int",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "queue_enqueue",
+          "queue_dequeue"
+        ],
+        "start_line": 320,
+        "end_line": 407,
+        "code": "uint64_t preempt_handler(uint64_t stack_ptr)\n{\n    // Send EOI to PIC first\n    outb(0x20, 0x20);  // Send EOI to master PIC\n    \n    // Update scheduler tick count\n    scheduler.total_ticks++;\n\n    // Every ~2 seconds (@100Hz), print a compact summary line\n    #if DEBUG_SCHED_SUMMARY\n    if ((scheduler.total_ticks % 200) == 0 && scheduler.total_ticks > 0) {\n        // Print total ticks\n        vga_print(\"\\n[SUM T=\", VGA_COLOR_LIGHT_CYAN);\n        vga_print_int(scheduler.total_ticks, VGA_COLOR_LIGHT_CYAN);\n        vga_print(\"] \", VGA_COLOR_LIGHT_CYAN);\n        \n        // Print current process first, if any\n        if (scheduler.current_process) {\n            uint32_t pct = (scheduler.current_process->total_ticks * 100) / scheduler.total_ticks;\n            vga_print(scheduler.current_process->name, VGA_COLOR_BROWN);\n            vga_print(\":\", VGA_COLOR_BROWN);\n            vga_print_int(scheduler.current_process->total_ticks, VGA_COLOR_BROWN);\n            vga_print(\" (\", VGA_COLOR_DARK_GREY);\n            vga_print_int(pct, VGA_COLOR_DARK_GREY);\n            vga_print(\"%)\", VGA_COLOR_DARK_GREY);\n            vga_print(\" | \", VGA_COLOR_DARK_GREY);\n        }\n        \n        // Walk ready queue and print each process ticks\n        process_t* it = scheduler.ready_queue_head;\n        while (it) {\n            uint32_t ipct = (it->total_ticks * 100) / scheduler.total_ticks;\n            vga_print(it->name, VGA_COLOR_BROWN);\n            vga_print(\":\", VGA_COLOR_BROWN);\n            vga_print_int(it->total_ticks, VGA_COLOR_BROWN);\n            vga_print(\" (\", VGA_COLOR_DARK_GREY);\n            vga_print_int(ipct, VGA_COLOR_DARK_GREY);\n            vga_print(\"%)\", VGA_COLOR_DARK_GREY);\n            if (it->next) {\n                vga_print(\" | \", VGA_COLOR_DARK_GREY);\n            }\n            it = it->next;\n        }\n        vga_print(\"\\n\", VGA_COLOR_WHITE);\n    }\n    #endif\n    \n    // If no current process, just return same stack\n    if (!scheduler.current_process) {\n        return stack_ptr;\n    }\n    \n    // Update process statistics\n    scheduler.current_process->total_ticks++;\n    scheduler.current_process->time_slice_remaining--;\n    \n    // Check if time slice expired\n    if (scheduler.current_process->time_slice_remaining <= 0) {\n        // Save current process's stack pointer and state\n        process_t* prev = scheduler.current_process;\n        prev->registers.rsp = stack_ptr;\n        prev->state = PROCESS_READY;\n        \n        // Add back to queue\n        queue_enqueue(prev);\n        \n        // Pick next process\n        process_t* next = queue_dequeue();\n        \n        if (next) {\n            // Switch to next process\n            next->state = PROCESS_RUNNING;\n            next->time_slice_remaining = TIME_SLICE_TICKS;\n            scheduler.current_process = next;\n            \n            // Return next process's stack pointer\n            return next->registers.rsp;\n        }\n        \n        // No other process, reset time slice and continue\n        prev->time_slice_remaining = TIME_SLICE_TICKS;\n        prev->state = PROCESS_RUNNING;\n        scheduler.current_process = prev;\n    }\n    \n    // No switch needed - return same stack\n    return stack_ptr;\n}"
+      },
+      "scheduler_start": {
+        "args": [],
+        "calls": [
+          "queue_dequeue",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "context_switch_asm",
+          "vga_print",
+          "vga_print"
+        ],
+        "start_line": 412,
+        "end_line": 436,
+        "code": "void scheduler_start(void)\n{\n    // Dequeue first process (removes from queue)\n    process_t* first = queue_dequeue();\n    \n    if (!first) {\n        vga_print(\"[ERR] No processes to run!\", VGA_COLOR_LIGHT_RED);\n        vga_print(\"\\n\", VGA_COLOR_WHITE);\n        return;\n    }\n    \n    vga_print(\"[*] Starting first process: \", VGA_COLOR_LIGHT_GREEN);\n    vga_print(first->name, VGA_COLOR_LIGHT_GREEN);\n    vga_print(\"\\n\\n\", VGA_COLOR_WHITE);\n    \n    first->state = PROCESS_RUNNING;\n    scheduler.current_process = first;\n    \n    // Switch to first process (no current process to save)\n    context_switch_asm(NULL, first);\n    \n    // Should never return here\n    vga_print(\"[ERR] Context switch returned!\", VGA_COLOR_LIGHT_RED);\n    vga_print(\"\\n\", VGA_COLOR_WHITE);\n}"
+      },
+      "do_schedule": {
+        "args": [],
+        "calls": [
+          "scheduler_pick_next",
+          "context_switch_asm"
+        ],
+        "start_line": 441,
+        "end_line": 462,
+        "code": "void do_schedule(void)\n{\n    process_t* current = scheduler.current_process;\n    \n    // Pick next process to run\n    process_t* next = scheduler_pick_next();\n    \n    if (!next) {\n        return;  // No process to switch to\n    }\n    \n    // Don't switch to ourselves\n    if (next == current) {\n        return;\n    }\n    \n    // Update scheduler state\n    scheduler.current_process = next;\n    \n    // Perform context switch: save current, load next\n    context_switch_asm(current, next);\n}"
+      },
+      "scheduler_print_stats": {
+        "args": [],
+        "calls": [
+          "vga_print",
+          "vga_print",
+          "vga_print_int",
+          "vga_print",
+          "vga_print_int",
+          "vga_print",
+          "vga_print",
+          "vga_print",
+          "vga_print_int",
+          "vga_print",
+          "vga_print_int",
+          "vga_print",
+          "vga_print",
+          "vga_print"
+        ],
+        "start_line": 467,
+        "end_line": 486,
+        "code": "void scheduler_print_stats(void)\n{\n    vga_print(\"\\n[SCHED] Scheduler Statistics:\\n\", VGA_COLOR_LIGHT_GREEN);\n    vga_print(\"  Total Ticks: \", VGA_COLOR_LIGHT_GREEN);\n    vga_print_int(scheduler.total_ticks, VGA_COLOR_LIGHT_GREEN);\n    vga_print(\"\\n  Processes: \", VGA_COLOR_LIGHT_GREEN);\n    vga_print_int(scheduler.process_count, VGA_COLOR_LIGHT_GREEN);\n    vga_print(\"\\n  Current: \", VGA_COLOR_LIGHT_GREEN);\n    if (scheduler.current_process) {\n        vga_print(scheduler.current_process->name, VGA_COLOR_LIGHT_GREEN);\n        vga_print(\" (PID \", VGA_COLOR_LIGHT_GREEN);\n        vga_print_int(scheduler.current_process->pid, VGA_COLOR_LIGHT_GREEN);\n        vga_print(\", CPU ticks: \", VGA_COLOR_LIGHT_GREEN);\n        vga_print_int(scheduler.current_process->total_ticks, VGA_COLOR_LIGHT_GREEN);\n        vga_print(\")\", VGA_COLOR_LIGHT_GREEN);\n    } else {\n        vga_print(\"None\", VGA_COLOR_LIGHT_GREEN);\n    }\n    vga_print(\"\\n\", VGA_COLOR_WHITE);\n}"
+      }
+    },
+    "classes": {},
+    "folder": "kernel\\proc",
+    "module": "process"
+  },
+  "repos\\BlitzOS\\kernel\\proc\\process.h": {
+    "file_path": "repos\\BlitzOS\\kernel\\proc\\process.h",
+    "language": "c",
+    "imports": [],
+    "functions": {},
+    "classes": {},
+    "folder": "kernel\\proc",
+    "module": "process"
   }
 }
