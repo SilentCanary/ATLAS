@@ -1,0 +1,76 @@
+# -----------------------------
+# 🔒 Ignore repos (your request)
+# -----------------------------
+repos/
+
+# -----------------------------
+# 🐍 Python cache & artifacts
+# -----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# -----------------------------
+# 📦 Virtual environments
+# -----------------------------
+venv/
+.env/
+.env.*
+.venv/
+
+# -----------------------------
+# 🧠 IDE / Editor files
+# -----------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# -----------------------------
+# 🧾 Logs & temp files
+# -----------------------------
+*.log
+*.tmp
+*.out
+
+# -----------------------------
+# 🧪 Test artifacts
+# -----------------------------
+.pytest_cache/
+.coverage
+htmlcov/
+
+# -----------------------------
+# 📊 Data / Generated files
+# (keep if your data is reproducible)
+# -----------------------------
+data/*.csv
+data/*.json
+data/*.pkl
+
+# -----------------------------
+# ⚙️ Build / distribution
+# -----------------------------
+build/
+dist/
+*.egg-info/
+
+# -----------------------------
+# 🔐 Secrets / config
+# -----------------------------
+.env
+*.env
+config.json
+
+# -----------------------------
+# 🧠 Model / heavy files (if any)
+# -----------------------------
+*.pt
+*.pth
+*.onnx
+
+# -----------------------------
+# 📝 Misc
+# -----------------------------
+.DS_Store
+Thumbs.db
