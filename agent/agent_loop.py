@@ -1,9 +1,55 @@
 import os
+import sys
+from collections import Counter
 from typing import Optional
 from utils.llm_call import ask_llm
 from utils.executor import execute_plan
 from agent.validator import CodeValidator
 from agent.dashboard import Dashboard
+
+# ---------------------------------------------------------------------------
+# ANSI Colors
+# ---------------------------------------------------------------------------
+if sys.platform == "win32":
+    os.system("")
+
+class C:
+    RST = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    MAGENTA = "\033[95m"
+    CYAN = "\033[96m"
+    WHITE = "\033[97m"
+    HEADER = "\033[1;96m"
+
+
+LANGUAGE_EXTENSIONS = {
+    "python": ".py",
+    "javascript": ".js",
+    "typescript": ".ts",
+    "go": ".go",
+    "rust": ".rs",
+    "java": ".java",
+    "c": ".c",
+    "cpp": ".cpp",
+    "solidity": ".sol",
+    "assembly": ".asm",
+}
+
+
+def _fence_lang(language: str) -> str:
+    if not language:
+        return ""
+    lang = language.lower()
+    return {
+        "javascript": "js",
+        "typescript": "ts",
+        "assembly": "asm",
+    }.get(lang, lang)
 
 
 class AgentLoop:
@@ -30,6 +76,7 @@ class AgentLoop:
         max_retries: int = 3,
         bdh_router=None,
         working_memory=None,
+        repo_language: Optional[str] = None,
     ):
         self.retriever = retriever
         self.graph_store = graph_store
@@ -38,6 +85,7 @@ class AgentLoop:
         self.repo_structure = repo_structure
         self.validator = CodeValidator()
         self.max_retries = max_retries
+        self.repo_language = repo_language or "python"
 
         # Optional BDH components
         self.bdh_router = bdh_router
@@ -61,6 +109,7 @@ class AgentLoop:
         top_nodes = [node for node, _ in results[:5]]
 
         snippets = {}
+        language_counts = Counter()
         for n in top_nodes:
             parts = n.split("::")
             if len(parts) >= 2:
@@ -75,8 +124,11 @@ class AgentLoop:
                             .get("code", ""))
                 else:
                     code = ""
+                lang = file_data.get("language")
                 if code:
-                    snippets[n] = code
+                    snippets[n] = {"code": code, "language": lang}
+                if lang:
+                    language_counts[lang] += 1
 
         folders = [self.graph_store.graph.nodes[n].get("folder") for n in top_nodes
                    if self.graph_store.graph.nodes[n].get("folder")]
@@ -86,6 +138,9 @@ class AgentLoop:
         for n in top_nodes:
             import_nodes.update(self.graph_store.get_full_upstream(n, types=["file", "module"]))
 
+        target_language = (language_counts.most_common(1)[0][0]
+                           if language_counts else self.repo_language)
+
         return {
             "retrieved_code": snippets,
             "target_folder": target_folder,
@@ -94,6 +149,8 @@ class AgentLoop:
             "memory_summary": self.memory.get_summary(max_nodes=10),
             "top_nodes": top_nodes,
             "results": results[:10],
+            "repo_language": self.repo_language,
+            "target_language": target_language,
         }
 
     def _decompose_task(self, task: str, context: dict) -> list:
@@ -140,12 +197,20 @@ file or function to create/modify. Be specific. Example:
 
     def _generate_code(self, subtask: str, context: dict) -> str:
         """Step 3: Generate code for a single subtask."""
+        language = context.get("target_language") or self.repo_language or "python"
         code_section = ""
-        for name, code in context.get("retrieved_code", {}).items():
-            code_section += f"\n### {name}\n```python\n{code}\n```\n"
+        for name, snippet in context.get("retrieved_code", {}).items():
+            if isinstance(snippet, dict):
+                snippet_code = snippet.get("code", "")
+                snippet_lang = snippet.get("language") or language
+            else:
+                snippet_code = snippet
+                snippet_lang = language
+            fence = _fence_lang(snippet_lang)
+            code_section += f"\n### {name}\n```{fence}\n{snippet_code}\n```\n"
 
         prompt = f"""
-You are writing Python code for a repository.
+You are writing {language} code for a repository.
 
 # Subtask:
 {subtask}
@@ -159,21 +224,23 @@ You are writing Python code for a repository.
 # Repo structure:
 {context.get('repo_structure', '')}
 
-Write ONLY the Python code. No explanations, no markdown fences.
-Include proper imports, docstrings, and error handling.
+Write ONLY the {language} code. No explanations, no markdown fences.
+Include proper imports and error handling where appropriate.
 """
         return ask_llm(prompt, max_tokens=4096, temperature=0.3)
 
-    def _reflect(self, subtask: str, code: str) -> tuple:
+    def _reflect(self, subtask: str, code: str, language: Optional[str] = None) -> tuple:
         """Step 5: LLM self-critique of generated code."""
+        target_language = language or self.repo_language
+        fence = _fence_lang(target_language)
         prompt = f"""
-Review this generated Python code for correctness and completeness.
+Review this generated {target_language} code for correctness and completeness.
 
 # Original task:
 {subtask}
 
 # Generated code:
-```python
+```{fence}
 {code}
 ```
 
@@ -226,30 +293,30 @@ Be concise. One line only.
             self.working_memory.reset()
             self.working_memory.process_step(task)
 
-        print(f"\n{'='*60}")
+        print(f"\n{C.HEADER}{'=' * 60}")
         print(f"  AGENT: {task}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}{C.RST}")
 
         # Step 1: Retrieve context
-        print("\n[1/7] Retrieving context...")
+        print(f"\n{C.CYAN}[1/7] Retrieving context...{C.RST}")
         context = self._retrieve_context(task)
 
-        print(f"  Found {len(context['retrieved_code'])} code snippets")
-        print(f"  Target folder: {context['target_folder']}")
+        print(f"  {C.DIM}Found {len(context['retrieved_code'])} code snippets{C.RST}")
+        print(f"  {C.DIM}Target folder: {context['target_folder']}{C.RST}")
 
         # Step 2: Decompose task
-        print("\n[2/7] Decomposing task...")
+        print(f"\n{C.CYAN}[2/7] Decomposing task...{C.RST}")
         subtasks = self._decompose_task(task, context)
-        print(f"  Subtasks:")
+        print(f"  {C.WHITE}Subtasks:{C.RST}")
         for i, st in enumerate(subtasks, 1):
-            print(f"    {i}. {st}")
+            print(f"    {C.MAGENTA}{i}.{C.RST} {st}")
 
         results = {"task": task, "subtasks": []}
 
         for idx, subtask in enumerate(subtasks, 1):
-            print(f"\n{'─'*40}")
-            print(f"  Subtask {idx}/{len(subtasks)}: {subtask}")
-            print(f"{'─'*40}")
+            print(f"\n{C.HEADER}{'─' * 40}")
+            print(f"  Subtask {idx}/{len(subtasks)}: {subtask[:50]}...")
+            print(f"{'─' * 40}{C.RST}")
 
             # Show dashboard if enabled
             if show_dashboard:
@@ -267,24 +334,25 @@ Be concise. One line only.
             issues = []
             for attempt in range(1, self.max_retries + 1):
                 # Step 3: Generate
-                print(f"\n  [3/7] Generating code (attempt {attempt})...")
+                print(f"\n  {C.CYAN}[3/7] Generating code (attempt {attempt})...{C.RST}")
                 raw_code = self._generate_code(subtask, context)
                 code = self._clean_code(raw_code)
 
                 # Step 4: Validate
-                print("  [4/7] Validating...")
-                valid, issues = self.validator.validate(code)
+                print(f"  {C.CYAN}[4/7] Validating...{C.RST}")
+                language = context.get("target_language") or self.repo_language or "python"
+                valid, issues = self.validator.validate(code, language=language)
                 if not valid:
-                    print(f"  Validation failed: {issues}")
+                    print(f"  {C.RED}Validation failed: {issues}{C.RST}")
                     if attempt < self.max_retries:
                         subtask = f"{subtask}\n\nPrevious attempt had errors: {issues}\nFix them."
                     continue
 
                 # Step 5: Self-critique
-                print("  [5/7] Self-critiquing...")
-                passed, critique_msg = self._reflect(subtask, code)
+                print(f"  {C.CYAN}[5/7] Self-critiquing...{C.RST}")
+                passed, critique_msg = self._reflect(subtask, code, language=language)
                 if not passed:
-                    print(f"  Critique: {critique_msg}")
+                    print(f"  {C.YELLOW}Critique: {critique_msg}{C.RST}")
                     if attempt < self.max_retries:
                         subtask = f"{subtask}\n\nSelf-critique feedback: {critique_msg}\nRevise the code."
                         continue
@@ -295,16 +363,16 @@ Be concise. One line only.
             if success:
                 # Step 6: Execute
                 if auto_save:
-                    print("  [6/7] Saving to disk...")
-                    file_name = self._suggest_filename(subtask)
+                    print(f"  {C.CYAN}[6/7] Saving to disk...{C.RST}")
+                    file_name = self._suggest_filename(subtask, language=context.get("target_language"))
                     path = execute_plan(code, context["target_folder"], file_name)
-                    print(f"  Saved: {path}")
+                    print(f"  {C.GREEN}Saved: {path}{C.RST}")
                 else:
-                    print("  [6/7] Code ready (auto-save disabled)")
-                    print(f"  Preview:\n{code[:500]}...")
+                    print(f"  {C.CYAN}[6/7] Code ready (auto-save disabled){C.RST}")
+                    print(f"  {C.DIM}Preview:\n{code[:500]}...{C.RST}")
 
                 # Step 7: Learn
-                print("  [7/7] Updating memory...")
+                print(f"  {C.CYAN}[7/7] Updating memory...{C.RST}")
                 self._learn(subtask, context.get("top_nodes", []))
 
                 results["subtasks"].append({
@@ -313,7 +381,7 @@ Be concise. One line only.
                     "status": "success",
                 })
             else:
-                print(f"  Failed after {self.max_retries} attempts")
+                print(f"  {C.RED}Failed after {self.max_retries} attempts{C.RST}")
                 results["subtasks"].append({
                     "subtask": subtask,
                     "code": code,
@@ -322,18 +390,20 @@ Be concise. One line only.
                 })
 
         succeeded = sum(1 for s in results["subtasks"] if s["status"] == "success")
-        print(f"\n{'='*60}")
+        print(f"\n{C.HEADER}{'=' * 60}")
         print(f"  DONE: {succeeded}/{len(subtasks)} subtasks completed")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}{C.RST}")
 
         return results
 
-    def _suggest_filename(self, subtask: str) -> str:
+    def _suggest_filename(self, subtask: str, language: Optional[str] = None) -> str:
         """Suggest a filename from the subtask description."""
+        lang = (language or self.repo_language or "python").lower()
+        ext = LANGUAGE_EXTENSIONS.get(lang, ".py")
         words = subtask.lower().split()
         for w in words:
-            if w.endswith(".py"):
+            if w.endswith(tuple(LANGUAGE_EXTENSIONS.values())):
                 return w
         clean = "".join(c if c.isalnum() or c == " " else "" for c in subtask.lower())
         name = "_".join(clean.split()[:3])
-        return f"{name}.py" if name else "generated.py"
+        return f"{name}{ext}" if name else f"generated{ext}"

@@ -1,14 +1,36 @@
 from .llm_call import ask_llm
 
 
-def _format_code_snippets(code_dict: dict, max_chars: int = 12000) -> str:
+def _fence_lang(language: str) -> str:
+    if not language:
+        return ""
+    lang = language.lower()
+    return {
+        "javascript": "js",
+        "typescript": "ts",
+        "assembly": "asm",
+    }.get(lang, lang)
+
+
+def _format_code_snippets(
+    code_dict: dict,
+    max_chars: int = 12000,
+    default_language: str = "python",
+) -> str:
     """Format code snippets for prompt injection, truncating if too large."""
     if not code_dict:
         return "No code snippets available."
     sections = []
     total = 0
     for name, code in code_dict.items():
-        snippet = f"### {name}\n```python\n{code}\n```"
+        if isinstance(code, dict):
+            snippet_code = code.get("code", "")
+            snippet_lang = code.get("language") or default_language
+        else:
+            snippet_code = code
+            snippet_lang = default_language
+        fence = _fence_lang(snippet_lang)
+        snippet = f"### {name}\n```{fence}\n{snippet_code}\n```"
         if total + len(snippet) > max_chars:
             sections.append(f"... ({len(code_dict) - len(sections)} more snippets truncated)")
             break
@@ -18,6 +40,7 @@ def _format_code_snippets(code_dict: dict, max_chars: int = 12000) -> str:
 
 
 def explain_repo(context: dict, user_query: str):
+    language = context.get("target_language") or context.get("repo_language") or "python"
     prompt = f"""
 You are an expert codebase analyst.
 
@@ -33,7 +56,7 @@ Your job is to HELP the user understand the repository based on context.
 {context.get('repo_structure', 'Not provided.')}
 
 # Relevant Code:
-{_format_code_snippets(context.get('retrieved_code', {}))}
+{_format_code_snippets(context.get('retrieved_code', {}), default_language=language)}
 
 # Memory Context:
 {context.get('memory_summary', 'No prior memory state.')}
@@ -52,8 +75,9 @@ Instructions:
 
 
 def plan_code(context: dict, user_query: str):
+    language = context.get("target_language") or context.get("repo_language") or "python"
     prompt = f"""
-You are adding a new feature to a Python repository.
+You are adding a new feature to a {language} repository.
 
 # Repository Overview:
 {context.get('repo_summary', 'No summary available.')}
@@ -65,10 +89,11 @@ You are adding a new feature to a Python repository.
 {context.get('repo_structure', 'Not provided.')}
 
 # Target folder for new code: {context.get('target_folder', 'new_folder')}
+# Target language: {language}
 # Suggested imports: {context.get('imports', [])}
 
 # Existing Code (for reference and integration):
-{_format_code_snippets(context.get('retrieved_code', {}))}
+{_format_code_snippets(context.get('retrieved_code', {}), default_language=language)}
 
 # Memory Context:
 {context.get('memory_summary', 'No prior memory state.')}
@@ -77,7 +102,7 @@ You are adding a new feature to a Python repository.
 {user_query}
 
 Instructions:
-- Write a Python file skeleton (do NOT overwrite existing files)
+- Write a {language} file skeleton (do NOT overwrite existing files)
 - Include proper imports, class/function definitions
 - Reference the relevant functions/methods from the code above
 - Make the code integrate with existing repo structure

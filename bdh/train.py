@@ -13,6 +13,7 @@ import os
 import time
 import argparse
 import json
+import importlib.util
 from dataclasses import asdict
 
 import torch
@@ -25,6 +26,12 @@ from bdh.data_pipeline import CodeDataPipeline
 CHECKPOINT_DIR = "bdh/checkpoints"
 TOKENIZER_PATH = "bdh/tokenizer.json"
 TRAIN_DATA_PATH = "bdh/train_data.bin"
+
+
+def _can_use_torch_compile() -> bool:
+    if os.getenv("ATLAS_DISABLE_COMPILE", "") == "1":
+        return False
+    return importlib.util.find_spec("triton") is not None
 
 
 def train_code_bdh(
@@ -105,7 +112,7 @@ def train_code_bdh(
 
     # Compile if available and on CUDA (skip on CPU to avoid compiler requirements)
     compiled = False
-    if device == "cuda":
+    if device == "cuda" and _can_use_torch_compile():
         try:
             model = torch.compile(model)
             compiled = True
@@ -113,7 +120,7 @@ def train_code_bdh(
         except Exception:
             pass
     if not compiled:
-        print("Using eager mode (no torch.compile)")
+        print("Using eager mode (torch.compile disabled)")
 
     # --- Optimizer ---
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.1)

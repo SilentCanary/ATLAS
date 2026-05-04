@@ -49,8 +49,10 @@ class CodeValidator:
         except (ModuleNotFoundError, ValueError):
             return False
 
-    def validate(self, code: str) -> Tuple[bool, list]:
+    def validate(self, code: str, language: str = "python") -> Tuple[bool, list]:
         """Run all validations, return (pass, list_of_issues)."""
+        if language and language.lower() != "python":
+            return True, []
         issues = []
 
         ok, msg = self.validate_syntax(code)

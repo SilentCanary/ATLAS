@@ -16,7 +16,10 @@ def build_cluster_prompt(cluster, contexts, snippets):
     text += "\nCode Snippets:\n"
     for node in cluster:
         if node in snippets:
-            text += f"\n{snippets[node]}\n"
+            snippet = snippets[node]
+            if isinstance(snippet, dict):
+                snippet = snippet.get("code", "")
+            text += f"\n{snippet}\n"
 
     text += "\nSummarize what this group of functions does in 1-2 lines."
 

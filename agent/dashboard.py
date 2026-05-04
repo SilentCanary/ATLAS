@@ -5,7 +5,29 @@ Shows BDH synapse activations, MemoryGraph hot paths, and retrieval context
 in a terminal-friendly format.
 """
 
+import os
+import sys
 from typing import Dict, List, Tuple, Optional
+
+# ---------------------------------------------------------------------------
+# ANSI Colors
+# ---------------------------------------------------------------------------
+if sys.platform == "win32":
+    os.system("")
+
+class C:
+    RST = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    MAGENTA = "\033[95m"
+    CYAN = "\033[96m"
+    WHITE = "\033[97m"
+    HEADER = "\033[1;96m"
+    BOX = "\033[90m"  # gray for box drawing
 
 
 class Dashboard:
@@ -30,52 +52,52 @@ class Dashboard:
         lines = []
 
         # Header
-        lines.append("=" * W)
-        lines.append("  ATLAS + BDH  |  Agent Dashboard")
-        lines.append("=" * W)
+        lines.append(f"{C.HEADER}{'=' * W}")
+        lines.append(f"  ATLAS + BDH  |  Agent Dashboard")
+        lines.append(f"{'=' * W}{C.RST}")
 
         # Current task
         if task:
-            lines.append(f"\n  Task: {task}")
+            lines.append(f"\n  {C.WHITE}Task:{C.RST} {task}")
         if subtask:
-            lines.append(f"  Subtask {subtask_idx}/{total_subtasks}: {subtask}")
+            lines.append(f"  {C.WHITE}Subtask {subtask_idx}/{total_subtasks}:{C.RST} {subtask[:45]}...")
         if phase:
-            lines.append(f"  Phase: {phase}")
+            lines.append(f"  {C.WHITE}Phase:{C.RST} {C.CYAN}{phase}{C.RST}")
 
         # BDH Working Memory
         if self.working_memory:
-            lines.append(f"\n{'─' * W}")
-            lines.append("  BDH Working Memory")
-            lines.append(f"{'─' * W}")
+            lines.append(f"\n{C.BOX}{'─' * W}{C.RST}")
+            lines.append(f"  {C.MAGENTA}BDH Working Memory{C.RST}")
+            lines.append(f"{C.BOX}{'─' * W}{C.RST}")
             concepts = self.working_memory.get_active_concepts(top_k=6)
             if concepts:
                 for name, score in concepts:
                     bar = _bar(score, 20)
-                    lines.append(f"  {name:25s} {bar} {score:.3f}")
+                    lines.append(f"  {C.WHITE}{name:25s}{C.RST} {C.CYAN}{bar}{C.RST} {C.DIM}{score:.3f}{C.RST}")
             else:
-                lines.append("  (empty — no steps processed yet)")
+                lines.append(f"  {C.DIM}(empty — no steps processed yet){C.RST}")
 
         # BDH Router (concept routing for current query)
         if self.bdh_router and subtask:
-            lines.append(f"\n{'─' * W}")
-            lines.append("  BDH Concept Routing")
-            lines.append(f"{'─' * W}")
+            lines.append(f"\n{C.BOX}{'─' * W}{C.RST}")
+            lines.append(f"  {C.MAGENTA}BDH Concept Routing{C.RST}")
+            lines.append(f"{C.BOX}{'─' * W}{C.RST}")
             try:
                 concepts = self.bdh_router.get_active_concepts(subtask, top_k=5)
                 for name, score in concepts:
                     bar = _bar(score, 20)
-                    lines.append(f"  {name:25s} {bar} {score:.3f}")
+                    lines.append(f"  {C.WHITE}{name:25s}{C.RST} {C.GREEN}{bar}{C.RST} {C.DIM}{score:.3f}{C.RST}")
             except Exception:
-                lines.append("  (BDH model not available)")
+                lines.append(f"  {C.DIM}(BDH model not available){C.RST}")
 
         # MemoryGraph
         if self.memory_graph and self.memory_graph.node_count > 0:
-            lines.append(f"\n{'─' * W}")
-            lines.append("  Hebbian Memory (Hot Paths)")
-            lines.append(f"{'─' * W}")
-            lines.append(f"  Nodes: {self.memory_graph.node_count}  "
+            lines.append(f"\n{C.BOX}{'─' * W}{C.RST}")
+            lines.append(f"  {C.MAGENTA}Hebbian Memory (Hot Paths){C.RST}")
+            lines.append(f"{C.BOX}{'─' * W}{C.RST}")
+            lines.append(f"  {C.DIM}Nodes: {self.memory_graph.node_count}  "
                          f"Edges: {self.memory_graph.edge_count}  "
-                         f"Updates: {self.memory_graph.stats['total_updates']}")
+                         f"Updates: {self.memory_graph.stats['total_updates']}{C.RST}")
 
             # Show top paths
             try:
@@ -93,21 +115,21 @@ class Dashboard:
                         best_tgt, best_w = edges[0]
                         short_src = _shorten(node_id, 25)
                         short_tgt = _shorten(best_tgt, 25)
-                        lines.append(f"  {short_src} --({best_w:.2f})--> {short_tgt}")
+                        lines.append(f"  {C.CYAN}{short_src}{C.RST} {C.YELLOW}--({best_w:.2f})-->{C.RST} {C.CYAN}{short_tgt}{C.RST}")
                     else:
-                        lines.append(f"  {_shorten(node_id, 50)} (rank: {rank:.4f})")
+                        lines.append(f"  {C.CYAN}{_shorten(node_id, 50)}{C.RST} {C.DIM}(rank: {rank:.4f}){C.RST}")
             except Exception:
-                lines.append("  (PageRank unavailable)")
+                lines.append(f"  {C.DIM}(PageRank unavailable){C.RST}")
 
         # Retrieved Context
         if retrieved:
-            lines.append(f"\n{'─' * W}")
-            lines.append("  Retrieved Context")
-            lines.append(f"{'─' * W}")
+            lines.append(f"\n{C.BOX}{'─' * W}{C.RST}")
+            lines.append(f"  {C.MAGENTA}Retrieved Context{C.RST}")
+            lines.append(f"{C.BOX}{'─' * W}{C.RST}")
             for node, score in retrieved[:8]:
-                lines.append(f"  {_shorten(node, 45)} (score: {score:.3f})")
+                lines.append(f"  {C.WHITE}{_shorten(node, 45)}{C.RST} {C.DIM}(score: {score:.3f}){C.RST}")
 
-        lines.append("\n" + "=" * W)
+        lines.append(f"\n{C.HEADER}{'=' * W}{C.RST}")
         return "\n".join(lines)
 
     def print_dashboard(self, **kwargs):
@@ -116,9 +138,9 @@ class Dashboard:
 
 
 def _bar(value: float, width: int = 20) -> str:
-    """Render a simple progress bar."""
+    """Render a simple progress bar with color."""
     filled = int(value * width)
-    return "[" + "#" * filled + "." * (width - filled) + "]"
+    return f"[{'#' * filled}{'.' * (width - filled)}]"
 
 
 def _shorten(text: str, max_len: int) -> str:

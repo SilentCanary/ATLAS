@@ -1,0 +1,649 @@
+e slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-03-17 00:00:02.585243: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING:tensorflow:From C:\Users\over9\AppData\Local\Programs\Python\Python312\Lib\site-packages\tf_keras\src\losses.py:2976: The name tf.losses.sparse_softmax_cross_entropy is deprecated. Please use tf.compat.v1.losses.sparse_softmax_cross_entropy instead.
+
+Enter the Github Repository URL: https://github.com/AditS-H/BlitzOS
+Cloning repository...
+Repo already exists. Pulling latest changes from https://github.com/AditS-H/BlitzOS...
+Parsing repository...
+C:\Users\over9\AppData\Local\Programs\Python\Python312\Lib\site-packages\tree_sitter\__init__.py:36: FutureWarning: Language(path, name) is deprecated. Use Language(ptr, name) instead.
+  warn("{} is deprecated. Use {} instead.".format(old, new), FutureWarning)
+Parsed repo saved to data\parsed_repo.json
+Building repository graph...
+Nodes: 146
+Edges: 225
+Graph saved to data/repo_graph.pkl
+Building semantic memory...
+Semantic memory built: 119 embeddings stored
+Loading or initializing Hebbian MemoryGraph...
+MemoryGraph loaded from previous session.
+BDH components not found. Train BDH first (option 6).
+
+--- MENU ---
+1. Explore / Understand Repository
+2. Generate Code (single-shot)
+3. Agent Mode (autonomous multi-step)
+4. Memory Stats
+5. Train BDH Model
+6. Load BDH Components
+7. Exit
+Choose an option (1-7): 1
+What do you want to know about the repo? what it does 
+
+Top retrieved nodes:
+function: repos\BlitzOS\kernel\proc\process.c::queue_dequeue (folder: kernel\proc, module: process, score: 0.200)
+function: repos\BlitzOS\kernel\mm\paging.c::paging_init (folder: kernel\mm, module: paging, score: 0.200)
+function: repos\BlitzOS\kernel\proc\process.c::scheduler_init (folder: kernel\proc, module: process, score: 0.200)
+function: repos\BlitzOS\kernel\arch\x86_64\isr.asm::isr_common_stub (folder: kernel\arch\x86_64, module: isr, score: 0.200)
+function: repos\BlitzOS\kernel\proc\process.c::do_schedule (folder: kernel\proc, module: process, score: 0.200)
+function: repos\BlitzOS\kernel\proc\process.c::scheduler_start (folder: kernel\proc, module: process, score: 0.200)
+function: repos\BlitzOS\drivers\keyboard.c::keyboard_handler (folder: drivers, module: keyboard, score: 0.200)
+function: repos\BlitzOS\kernel\proc\process.c::process_create (folder: kernel\proc, module: process, score: 0.200)
+function: repos\BlitzOS\drivers\vga.c::vga_print_int (folder: drivers, module: vga, score: 0.200)
+function: repos\BlitzOS\kernel\proc\process.c::scheduler_pick_next (folder: kernel\proc, module: process, score: 0.200)
+
+--- RAW RESPONSE ---
+ {"choices":[{"finish_reason":"stop","index":0,"logprobs":null,"message":{"content":"This group of functions implements a simple process scheduler in the BlitzOS kernel. `scheduler_init` initializes the scheduler's data structures, `queue_dequeue` removes a process from the ready queue for execution, and `do_schedule` handles the core scheduling logic by selecting the next process and performing a context switch.","refusal":null,"role":"assistant"}}],"created":1773685843,"id":"chatcmpl-e4d011cf-cd6e-4ae2-bf65-151054f70425","model":"mistral.devstral-2-123b","object":"chat.completion","service_tier":"default","usage":{"completion_tokens":66,"prompt_tokens":882,"total_tokens":948}}
+--- END RAW RESPONSE ---
+
+
+--- RAW RESPONSE ---
+ {"choices":[{"finish_reason":"stop","index":0,"logprobs":null,"message":{"content":"This function initializes paging by retrieving the current PML4 (page table root) from the CR3 register, confirming its address, and acknowledging that paging was already enabled by the bootloader with identity mapping for the first 2 MB.","refusal":null,"role":"assistant"}}],"created":1773685844,"id":"chatcmpl-daefa9f1-2fde-4999-88b1-9fcfd498f246","model":"mistral.devstral-2-123b","object":"chat.completion","service_tier":"default","usage":{"completion_tokens":49,"prompt_tokens":477,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":16},"total_tokens":526}}
+--- END RAW RESPONSE ---
+
+
+--- RAW RESPONSE ---
+ {"choices":[{"finish_reason":"stop","index":0,"logprobs":null,"message":{"content":"This code defines an interrupt service routine (ISR) common stub in x86_64 assembly that saves processor state, calls a C interrupt handler (`isr_handler`), and then restores the state before returning from the interrupt. It handles both hardware interrupts and exceptions by preserving all registers and cleaning up the stack.","refusal":null,"role":"assistant"}}],"created":1773685845,"id":"chatcmpl-54e23dde-26a3-4abe-836f-f2614c68fb19","model":"mistral.devstral-2-123b","object":"chat.completion","service_tier":"default","usage":{"completion_tokens":66,"prompt_tokens":456,"total_tokens":522}}
+--- END RAW RESPONSE ---
+
+
+--- RAW RESPONSE ---
+ {"choices":[{"finish_reason":"stop","index":0,"logprobs":null,"message":{"content":"# BlitzOS: A Simple x86_64 Operating System\n\nThis project is a minimal operating system kernel called BlitzOS, designed for the x86_64 architecture. It implements core OS functionality including process scheduling, memory management, interrupt handling, and basic device drivers.\n\n## Project Structure and Purpose\n\nThe project is organized into several key components:\n\n### 1. Boot System\n- **`boot/grub/grub.cfg`**: GRUB configuration file for booting the OS\n- **`kernel/arch/x86_64/boot/boot.asm`**: Assembly code for initial boot process\n- **`kernel/boot/multiboot2.c`**: Multiboot2 specification compliance for bootloader interaction\n\n### 2. Core Kernel Components\n- **Process Scheduling** (`kernel/proc/`):\n  - Implements a simple process scheduler with a ready queue\n  - Handles context switching between processes\n  - Core functions: `scheduler_init`, `queue_dequeue`, `do_schedule`\n\n- **Memory Management** (`kernel/mm/`):\n  - Physical memory management (`pmm.c`)\n  - Paging system (`paging.c`) - sets up page tables and confirms paging is enabled\n  - Kernel heap allocation (`kheap.c`)\n\n- **Interrupt Handling** (`kernel/arch/x86_64/`):\n  - Interrupt Descriptor Table (IDT) setup (`idt.c`)\n  - Interrupt Service Routines (ISR) in assembly (`isr.asm`)\n  - Hardware interrupt handling (`interrupts.c`)\n\n### 3. Device Drivers (`drivers/`)\n- Keyboard driver (`keyboard.c`)\n- Programmable Interval Timer (PIT) for timing (`pit.c`)\n- VGA text mode display (`vga.c`)\n\n### 4. Build System\n- **`Makefile`**: Primary build script\n- **`scripts/linker.ld`**: Linker script defining memory layout\n- **`build-cross-compiler.sh`**: Script for building a cross-compiler toolchain\n- **`run_blitzos.sh`**: Script for running the OS in an emulator\n\n### 5. Version Control\n- The `.git/` directory shows this is a Git repository with standard Git configuration\n- Includes sample Git hooks in `.git/hooks/`\n\n## Technical Details\n\n1. **Architecture**: x86_64 (64-bit x86 architecture)\n2. **Boot Process**: Uses Multiboot2 specification for bootloader compatibility\n3. **Memory Management**:\n   - Paging is enabled by the bootloader with identity mapping for first 2MB\n   - Physical memory management and kernel heap allocation\n4. **Process Management**:\n   - Simple scheduler with ready queue\n   - Context switching between processes\n5. **Interrupt Handling**:\n   - Assembly ISR stubs that save processor state\n   - C-based interrupt handlers\n   - IDT setup for interrupt routing\n\n## Development Tools\n\nThe project includes configuration files for:\n- Editor settings (`.editorconfig`)\n- Git attributes (`.gitattributes`)\n- Git ignore patterns (`.gitignore`)\n\n## Summary\n\nBlitzOS is a minimal but functional operating system kernel that demonstrates core OS concepts like process scheduling, memory management, and interrupt handling. It's designed to be simple enough to understand while implementing essential OS functionality. The project appears to be educational in nature, providing a foundation that could be extended with additional features like system calls, filesystems, or more sophisticated scheduling algorithms.","refusal":null,"role":"assistant"}}],"created":1773685847,"id":"chatcmpl-e62b72a6-20d5-47d9-9a58-5902a8e01086","model":"mistral.devstral-2-123b","object":"chat.completion","service_tier":"default","usage":{"completion_tokens":733,"prompt_tokens":977,"total_tokens":1710}}
+--- END RAW RESPONSE ---
+
+
+ Cluster Summaries:
+['repos\\BlitzOS\\kernel\\proc\\process.c::queue_dequeue', 'repos\\BlitzOS\\kernel\\proc\\process.c::scheduler_init', 'repos\\BlitzOS\\kernel\\proc\\process.c::do_schedule'] -> This group of functions implements a simple process scheduler in the BlitzOS kernel. `scheduler_init` initializes the scheduler's data structures, `queue_dequeue` removes a process from the ready queue for execution, and `do_schedule` handles the core scheduling logic by selecting the next process and performing a context switch.
+['repos\\BlitzOS\\kernel\\mm\\paging.c::paging_init'] -> This function initializes paging by retrieving the current PML4 (page table root) from the CR3 register, confirming its address, and acknowledging that paging was already enabled by the bootloader with identity mapping for the first 2 MB.
+['repos\\BlitzOS\\kernel\\arch\\x86_64\\isr.asm::isr_common_stub'] -> This code defines an interrupt service routine (ISR) common stub in x86_64 assembly that saves processor state, calls a C interrupt handler (`isr_handler`), and then restores the state before returning from the interrupt. It handles both hardware interrupts and exceptions by preserving all registers and cleaning up the stack.
+
+ Global Summary:
+ # BlitzOS: A Simple x86_64 Operating System
+
+This project is a minimal operating system kernel called BlitzOS, designed for the x86_64 architecture. It implements core OS functionality including process scheduling, memory management, interrupt handling, and basic device drivers.
+
+## Project Structure and Purpose
+
+The project is organized into several key components:
+
+### 1. Boot System
+- **`boot/grub/grub.cfg`**: GRUB configuration file for booting the OS
+- **`kernel/arch/x86_64/boot/boot.asm`**: Assembly code for initial boot process
+- **`kernel/boot/multiboot2.c`**: Multiboot2 specification compliance for bootloader interaction
+
+### 2. Core Kernel Components
+- **Process Scheduling** (`kernel/proc/`):
+  - Implements a simple process scheduler with a ready queue
+  - Handles context switching between processes
+  - Core functions: `scheduler_init`, `queue_dequeue`, `do_schedule`
+
+- **Memory Management** (`kernel/mm/`):
+  - Physical memory management (`pmm.c`)
+  - Paging system (`paging.c`) - sets up page tables and confirms paging is enabled
+  - Kernel heap allocation (`kheap.c`)
+
+- **Interrupt Handling** (`kernel/arch/x86_64/`):
+  - Interrupt Descriptor Table (IDT) setup (`idt.c`)
+  - Interrupt Service Routines (ISR) in assembly (`isr.asm`)
+  - Hardware interrupt handling (`interrupts.c`)
+
+### 3. Device Drivers (`drivers/`)
+- Keyboard driver (`keyboard.c`)
+- Programmable Interval Timer (PIT) for timing (`pit.c`)
+- VGA text mode display (`vga.c`)
+
+### 4. Build System
+- **`Makefile`**: Primary build script
+- **`scripts/linker.ld`**: Linker script defining memory layout
+- **`build-cross-compiler.sh`**: Script for building a cross-compiler toolchain
+- **`run_blitzos.sh`**: Script for running the OS in an emulator
+
+### 5. Version Control
+- The `.git/` directory shows this is a Git repository with standard Git configuration
+- Includes sample Git hooks in `.git/hooks/`
+
+## Technical Details
+
+1. **Architecture**: x86_64 (64-bit x86 architecture)
+2. **Boot Process**: Uses Multiboot2 specification for bootloader compatibility
+3. **Memory Management**:
+   - Paging is enabled by the bootloader with identity mapping for first 2MB
+   - Physical memory management and kernel heap allocation
+4. **Process Management**:
+   - Simple scheduler with ready queue
+   - Context switching between processes
+5. **Interrupt Handling**:
+   - Assembly ISR stubs that save processor state
+   - C-based interrupt handlers
+   - IDT setup for interrupt routing
+
+## Development Tools
+
+The project includes configuration files for:
+- Editor settings (`.editorconfig`)
+- Git attributes (`.gitattributes`)
+- Git ignore patterns (`.gitignore`)
+
+## Summary
+
+BlitzOS is a minimal but functional operating system kernel that demonstrates core OS concepts like process scheduling, memory management, and interrupt handling. It's designed to be simple enough to understand while implementing essential OS functionality. The project appears to be educational in nature, providing a foundation that could be extended with additional features like system calls, filesystems, or more sophisticated scheduling algorithms.
+
+--- RAW RESPONSE ---
+ {"choices":[{"finish_reason":"stop","index":0,"logprobs":null,"message":{"content":"# What BlitzOS Does\n\nBlitzOS is a minimal x86_64 operating system kernel that demonstrates core OS functionality. Here's what it does:\n\n## Core Functionality\n\n1. **Boot Process**\n   - Initializes through GRUB using Multiboot2 specification\n   - Sets up basic CPU state and memory mapping\n   - Transitions from bootloader to kernel execution\n\n2. **Memory Management**\n   - **Paging**: Uses the bootloader's identity-mapped page tables (first 2MB)\n   - **Physical Memory**: Tracks free/used pages with a bitmap\n   - **Kernel Heap**: Provides dynamic memory allocation for kernel structures\n\n3. **Process Scheduling**\n   - Maintains a ready queue of processes\n   - Implements simple round-robin scheduling\n   - Performs context switching between processes\n   - Key functions: `scheduler_init`, `queue_dequeue`, `do_schedule`\n\n4. **Interrupt Handling**\n   - Sets up the Interrupt Descriptor Table (IDT)\n   - Handles hardware interrupts (keyboard, timer) and exceptions\n   - Saves/restores processor state during interrupts\n   - Uses `isr_common_stub` as the assembly entry point for all interrupts\n\n5. **Device Drivers**\n   - **Keyboard**: Handles key presses and displays them on screen\n   - **PIT (Programmable Interval Timer)**: Provides system timing\n   - **VGA**: Text-mode display output\n\n## Data Flow Example (Keyboard Input)\n\n1. User presses a key → generates hardware interrupt\n2. CPU jumps to ISR stub (`isr_common_stub`)\n3. Assembly code saves processor state\n4. C handler (`isr_handler`) processes the interrupt\n5. Keyboard driver reads scan code and converts to character\n6. Character is displayed via VGA driver\n7. Processor state is restored and execution continues\n\n## Key Modules\n\n- **Process Management** (`kernel/proc/`): Handles task scheduling and context switching\n- **Memory Management** (`kernel/mm/`): Manages physical memory and paging\n- **Interrupt Handling** (`kernel/arch/x86_64/`): Processes hardware events\n- **Device Drivers** (`drivers/`): Provides hardware abstraction\n\nBlitzOS is primarily educational - it demonstrates fundamental OS concepts in a simple, understandable implementation while being functional enough to run in an emulator.","refusal":null,"role":"assistant"}}],"created":1773685859,"id":"chatcmpl-9f44ba87-d42b-47cf-aae3-096f2ed4267e","model":"mistral.devstral-2-123b","object":"chat.completion","service_tier":"default","usage":{"completion_tokens":499,"prompt_tokens":3283,"total_tokens":3782}}
+--- END RAW RESPONSE ---
+
+
+ Answer:
+ # What BlitzOS Does
+
+BlitzOS is a minimal x86_64 operating system kernel that demonstrates core OS functionality. Here's what it does:
+
+## Core Functionality
+
+1. **Boot Process**
+   - Initializes through GRUB using Multiboot2 specification
+   - Sets up basic CPU state and memory mapping
+   - Transitions from bootloader to kernel execution
+
+2. **Memory Management**
+   - **Paging**: Uses the bootloader's identity-mapped page tables (first 2MB)
+   - **Physical Memory**: Tracks free/used pages with a bitmap
+   - **Kernel Heap**: Provides dynamic memory allocation for kernel structures
+
+3. **Process Scheduling**
+   - Maintains a ready queue of processes
+   - Implements simple round-robin scheduling
+   - Performs context switching between processes
+   - Key functions: `scheduler_init`, `queue_dequeue`, `do_schedule`
+
+4. **Interrupt Handling**
+   - Sets up the Interrupt Descriptor Table (IDT)
+   - Handles hardware interrupts (keyboard, timer) and exceptions
+   - Saves/restores processor state during interrupts
+   - Uses `isr_common_stub` as the assembly entry point for all interrupts
+
+5. **Device Drivers**
+   - **Keyboard**: Handles key presses and displays them on screen
+   - **PIT (Programmable Interval Timer)**: Provides system timing
+   - **VGA**: Text-mode display output
+
+## Data Flow Example (Keyboard Input)
+
+1. User presses a key → generates hardware interrupt
+2. CPU jumps to ISR stub (`isr_common_stub`)
+3. Assembly code saves processor state
+4. C handler (`isr_handler`) processes the interrupt
+5. Keyboard driver reads scan code and converts to character
+6. Character is displayed via VGA driver
+7. Processor state is restored and execution continues
+
+## Key Modules
+
+- **Interrupt Handling** (`kernel/arch/x86_64/`): Processes hardware events
+- **Device Drivers** (`drivers/`): Provides hardware abstraction
+
+BlitzOS is primarily educational - it demonstrates fundamental OS concepts in a simple, understandable implementation while being functional enough to run in an emulator.
+
+--- MENU ---
+1. Explore / Understand Repository
+2. Generate Code (single-shot)
+3. Agent Mode (autonomous multi-step)
+4. Memory Stats
+5. Train BDH Model
+6. Load BDH Components
+7. Exit
+Choose an option (1-7): 5
+
+==================================================
+  BDH Training
+==================================================
+CPU detected - using small model config (~3M params)
+Training iterations (default 500): Traceback (most recent call last):
+  File "E:\Minor\atlas\ATLAS\main2.py", line 344, in <module>
+    train_bdh(repo_path, parsed, repo_graph)
+  File "E:\Minor\atlas\ATLAS\main2.py", line 162, in train_bdh
+    iters = input("Training iterations (default 500): ").strip()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+PS E:\Minor\atlas\ATLAS> python main2.py
+2026-03-17 00:04:06.017194: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-03-17 00:04:10.111263: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING:tensorflow:From C:\Users\over9\AppData\Local\Programs\Python\Python312\Lib\site-packages\tf_keras\src\losses.py:2976: The name tf.losses.sparse_softmax_cross_entropy is deprecated. Please use tf.compat.v1.losses.sparse_softmax_cross_entropy instead.
+
+Enter the Github Repository URL: https://github.com/AditS-H/BlitzOS                                   
+Cloning repository...
+Repo already exists. Pulling latest changes from https://github.com/AditS-H/BlitzOS...
+Parsing repository...
+C:\Users\over9\AppData\Local\Programs\Python\Python312\Lib\site-packages\tree_sitter\__init__.py:36: FutureWarning: Language(path, name) is deprecated. Use Language(ptr, name) instead.
+  warn("{} is deprecated. Use {} instead.".format(old, new), FutureWarning)
+Parsed repo saved to data\parsed_repo.json
+Building repository graph...
+Nodes: 146
+Edges: 225
+Graph saved to data/repo_graph.pkl
+Building semantic memory...
+Semantic memory built: 119 embeddings stored
+Loading or initializing Hebbian MemoryGraph...
+MemoryGraph loaded from previous session.
+BDH components not found. Train BDH first (option 6).
+
+--- MENU ---
+1. Explore / Understand Repository
+2. Generate Code (single-shot)
+3. Agent Mode (autonomous multi-step)
+4. Memory Stats
+5. Train BDH Model
+6. Load BDH Components
+7. Exit
+Choose an option (1-7): 5
+
+==================================================
+  BDH Training
+==================================================
+CPU detected - using small model config (~3M params)
+Training iterations (default 500): 500
+
+Config: 128d, 4 heads, 4 layers
+Neurons: 4096
+Device: cpu
+Loading existing tokenizer from bdh/tokenizer.json
+Preparing training data...
+Collecting raw Python code...
+7. Exit
+Choose an option (1-7): 5
+
+==================================================
+  BDH Training
+==================================================
+CPU detected - using small model config (~3M params)
+Training iterations (default 500): 500
+
+Config: 128d, 4 heads, 4 layers
+Neurons: 4096
+Device: cpu
+Loading existing tokenizer from bdh/tokenizer.json
+Preparing training data...
+Collecting raw Python code...
+
+==================================================
+  BDH Training
+==================================================
+CPU detected - using small model config (~3M params)
+Training iterations (default 500): 500
+
+Config: 128d, 4 heads, 4 layers
+Neurons: 4096
+Device: cpu
+Loading existing tokenizer from bdh/tokenizer.json
+Preparing training data...
+Collecting raw Python code...
+CPU detected - using small model config (~3M params)
+Training iterations (default 500): 500
+
+Config: 128d, 4 heads, 4 layers
+Neurons: 4096
+Device: cpu
+Loading existing tokenizer from bdh/tokenizer.json
+Preparing training data...
+Collecting raw Python code...
+Neurons: 4096
+Device: cpu
+Loading existing tokenizer from bdh/tokenizer.json
+Preparing training data...
+Collecting raw Python code...
+  24 raw code files
+Generating structured representations...
+  24 raw code files
+Generating structured representations...
+  24 structured entries
+  24 structured entries
+Generating graph-annotated code...
+Generating graph-annotated code...
+  94 annotated entries
+  94 annotated entries
+Total training samples: 139
+Total tokens: 86,248
+Training data saved to bdh/train_data.bin (0.7 MB)
+Train tokens: 77,623 | Val tokens: 8,625
+Model parameters: 2,022,912 (2.0M)
+Neuron count: 4,096
+Using eager mode (no torch.compile)
+
+Training data saved to bdh/train_data.bin (0.7 MB)
+Train tokens: 77,623 | Val tokens: 8,625
+Model parameters: 2,022,912 (2.0M)
+Neuron count: 4,096
+Training data saved to bdh/train_data.bin (0.7 MB)
+Training data saved to bdh/train_data.bin (0.7 MB)
+Train tokens: 77,623 | Val tokens: 8,625
+Model parameters: 2,022,912 (2.0M)
+Neuron count: 4,096
+Using eager mode (no torch.compile)
+
+Starting training: 500 iterations, batch_size=16
+------------------------------------------------------------
+iter     0 | loss 7.4943 | 776 tok/s
+iter    10 | loss 5.9909 | 952 tok/s
+iter    20 | loss 4.9564 | 962 tok/s
+iter    30 | loss 4.1594 | 968 tok/s
+iter    40 | loss 3.5215 | 968 tok/s
+iter    50 | loss 3.3686 | 957 tok/s
+iter    60 | loss 2.7689 | 954 tok/s
+iter    70 | loss 2.8354 | 958 tok/s
+iter    80 | loss 2.4976 | 962 tok/s
+iter    90 | loss 2.2668 | 967 tok/s
+iter   100 | loss 1.5363 | 967 tok/s
+  VAL loss: 2.3313 *BEST*
+  Checkpoint saved: bdh/checkpoints\best.pt
+iter   110 | loss 1.7059 | 947 tok/s
+iter   120 | loss 1.5185 | 944 tok/s
+iter   130 | loss 1.4181 | 941 tok/s
+iter   140 | loss 1.2209 | 945 tok/s
+iter   150 | loss 1.2270 | 951 tok/s
+iter   160 | loss 0.9199 | 954 tok/s
+iter   170 | loss 1.0614 | 954 tok/s
+iter   180 | loss 0.8603 | 952 tok/s
+iter   190 | loss 0.9825 | 950 tok/s
+iter   200 | loss 0.8071 | 949 tok/s
+  VAL loss: 1.5893 *BEST*
+  Checkpoint saved: bdh/checkpoints\best.pt
+iter   210 | loss 0.7171 | 939 tok/s
+iter   220 | loss 0.7105 | 942 tok/s
+iter   230 | loss 0.6534 | 944 tok/s
+iter   240 | loss 0.6274 | 947 tok/s
+iter   250 | loss 0.6013 | 949 tok/s
+iter   260 | loss 0.7685 | 950 tok/s
+iter   270 | loss 0.6092 | 946 tok/s
+iter   280 | loss 0.4349 | 940 tok/s
+iter   290 | loss 0.4348 | 935 tok/s
+iter   300 | loss 0.5456 | 931 tok/s
+  VAL loss: 1.3139 *BEST*
+  Checkpoint saved: bdh/checkpoints\best.pt
+iter   310 | loss 0.4196 | 924 tok/s
+iter   320 | loss 0.3242 | 927 tok/s
+iter   330 | loss 0.4417 | 929 tok/s
+iter   340 | loss 0.3398 | 931 tok/s
+iter   350 | loss 0.3367 | 933 tok/s
+iter   360 | loss 0.3769 | 936 tok/s
+iter   370 | loss 0.3400 | 938 tok/s
+iter   380 | loss 0.3073 | 940 tok/s
+iter   390 | loss 0.3502 | 941 tok/s
+iter   400 | loss 0.2849 | 939 tok/s
+  VAL loss: 1.3993 
+iter   410 | loss 0.2667 | 931 tok/s
+iter   420 | loss 0.3044 | 932 tok/s
+iter   430 | loss 0.3118 | 932 tok/s
+iter   440 | loss 0.2719 | 929 tok/s
+iter   450 | loss 0.2402 | 926 tok/s
+iter   460 | loss 0.2507 | 924 tok/s
+iter   470 | loss 0.1944 | 922 tok/s
+iter   480 | loss 0.2177 | 920 tok/s
+iter   490 | loss 0.2254 | 919 tok/s
+  Checkpoint saved: bdh/checkpoints\final.pt
+
+Training complete in 2233s
+Best validation loss: 1.3139
+
+Building concept map...
+  import_statement: 50 active synapses (max: 0.0615)
+  function_definition: 50 active synapses (max: 0.0611)
+  class_definition: 50 active synapses (max: 0.0558)
+  error_handling: 50 active synapses (max: 0.0530)
+  loop_pattern: 50 active synapses (max: 0.0682)
+  decorator_pattern: 50 active synapses (max: 0.0542)
+  string_formatting: 50 active synapses (max: 0.0678)
+  file_io: 50 active synapses (max: 0.0448)
+  data_structure: 50 active synapses (max: 0.0565)
+  async_pattern: 50 active synapses (max: 0.0517)
+Concept map saved to bdh/concept_map.json
+
+============================================================
+  BDH Synapse → Concept Report
+============================================================
+
+  import_statement
+    Active synapses: 50
+    Max activation:  0.0615 [#...................]
+    Top 5 synapses:  [514, 604, 1005, 523, 407]
+
+  function_definition
+    Active synapses: 50
+    Max activation:  0.0611 [#...................]
+    Top 5 synapses:  [352, 279, 749, 575, 604]
+
+  class_definition
+    Active synapses: 50
+    Max activation:  0.0558 [#...................]
+    Top 5 synapses:  [523, 564, 1008, 573, 685]
+
+  error_handling
+    Active synapses: 50
+    Max activation:  0.0530 [#...................]
+    Top 5 synapses:  [575, 564, 967, 352, 480]
+
+  loop_pattern
+    Active synapses: 50
+    Max activation:  0.0682 [#...................]
+    Top 5 synapses:  [803, 352, 1006, 563, 954]
+
+  decorator_pattern
+    Active synapses: 50
+    Max activation:  0.0542 [#...................]
+    Top 5 synapses:  [523, 749, 181, 414, 142]
+
+  string_formatting
+    Active synapses: 50
+    Max activation:  0.0678 [#...................]
+    Top 5 synapses:  [352, 564, 547, 838, 841]
+
+  file_io
+    Active synapses: 50
+    Max activation:  0.0448 [....................]
+    Top 5 synapses:  [544, 352, 414, 159, 181]
+
+  data_structure
+    Active synapses: 50
+    Max activation:  0.0565 [#...................]
+    Top 5 synapses:  [803, 1008, 841, 564, 685]
+
+  async_pattern
+    Active synapses: 50
+    Max activation:  0.0517 [#...................]
+    Top 5 synapses:  [888, 919, 545, 575, 1006]
+
+============================================================
+
+BDH training complete!
+Loading BDH model on cpu...
+BDH components loaded successfully!
+  Model: 128d, 4 heads, 4096 neurons
+  Concepts mapped: 10
+
+--- MENU ---
+1. Explore / Understand Repository
+2. Generate Code (single-shot)
+3. Agent Mode (autonomous multi-step)
+4. Memory Stats
+5. Train BDH Model [TRAINED]
+6. Load BDH Components [LOADED]
+7. Exit
+Choose an option (1-7): 4
+
+Memory Stats:
+  Nodes: 463
+  Edges: 689
+  Total Hebbian updates: 928
+  Edges pruned: 0
+  Graph density: 0.0032
+
+Top concepts (by PageRank):
+## Prior Knowledge State (Memory Graph)
+Total: 463 concepts, 689 relations
+
+### repos\BlitzOS\drivers\vga.c::vga_entry [function] (relevance: 0.017)
+### repos\BlitzOS\drivers\vga.c::vga_putchar [function] (relevance: 0.016)
+  → repos\BlitzOS\drivers\vga.c::vga_scroll (calls, w=0.100)
+  → repos\BlitzOS\drivers\vga.c::vga_entry (calls, w=0.100)
+### repos\BlitzOS\drivers\vga.c::vga_print [function] (relevance: 0.013)
+  → repos\BlitzOS\drivers\vga.c::vga_putchar (calls, w=0.100)
+### repos\BlitzOS\drivers\vga.c::vga_scroll [function] (relevance: 0.008)
+  → repos\BlitzOS\drivers\vga.c::vga_entry (calls, w=0.100)
+### self.get_full_downstream [external_function] (relevance: 0.008)
+
+BDH Status: ACTIVE
+
+--- MENU ---
+1. Explore / Understand Repository
+2. Generate Code (single-shot)
+3. Agent Mode (autonomous multi-step)
+4. Memory Stats
+5. Train BDH Model [TRAINED]
+6. Load BDH Components [LOADED]
+7. Exit
+Choose an option (1-7): 6
+Loading BDH model on cpu...
+BDH components loaded successfully!
+  Model: 128d, 4 heads, 4096 neurons
+  Concepts mapped: 10
+
+--- MENU ---
+1. Explore / Understand Repository
+2. Generate Code (single-shot)
+3. Agent Mode (autonomous multi-step)
+4. Memory Stats
+5. Train BDH Model [TRAINED]
+6. Load BDH Components [LOADED]
+7. Exit
+Choose an option (1-7): 2
+Enter the new feature or code you want to add: add single level paging a little
+
+--- RAW RESPONSE ---
+ {"choices":[{"finish_reason":"stop","index":0,"logprobs":null,"message":{"content":"Based on the repository structure and the task to add single level paging, I'll create a new Python file that integrates with the existing C-based kernel code. Here's the skeleton for a new Python file that would help manage paging configuration:\n\n```python\n# new_folder/paging_config.py\nimport struct\nimport os\nfrom typing import List, Dict, Optional\n\nclass PageTableEntry:\n    def __init__(self, present: bool = False, writable: bool = False,\n                 user_accessible: bool = False, write_through: bool = False,\n                 cache_disabled: bool = False, accessed: bool = False,\n                 dirty: bool = False, pat: bool = False, global_page: bool = False,\n                 frame_address: int = 0):\n        self.present = present\n        self.writable = writable\n        self.user_accessible = user_accessible\n        self.write_through = write_through\n        self.cache_disabled = cache_disabled\n        self.accessed = accessed\n        self.dirty = dirty\n        self.pat = pat\n        self.global_page = global_page\n        self.frame_address = frame_address\n\n    def to_bytes(self) -> bytes:\n        flags = (self.present << 0) | (self.writable << 1) | \\\n                (self.user_accessible << 2) | (self.write_through << 3) | \\\n                (self.cache_disabled << 4) | (self.accessed << 5) | \\\n                (self.dirty << 6) | (self.pat << 7) | (self.global_page << 8)\n        return struct.pack('<Q', (flags << 12) | (self.frame_address & 0x000FFFFFFFFFF000))\n\nclass SingleLevelPaging:\n    def __init__(self, page_size: int = 4096, entries_per_table: int = 512):\n        self.page_size = page_size\n        self.entries_per_table = entries_per_table\n        self.page_tables: Dict[int, List[PageTableEntry]] = {}\n\n    def create_page_table(self, table_id: int) -> None:\n        self.page_tables[table_id] = [PageTableEntry() for _ in range(self.entries_per_table)]\n\n    def map_page(self, table_id: int, virtual_addr: int, physical_addr: int,\n                 flags: PageTableEntry) -> None:\n        if table_id not in self.page_tables:\n            self.create_page_table(table_id)\n\n        index = virtual_addr // self.page_size\n        if index >= self.entries_per_table:\n            raise IndexError(\"Virtual address out of range\")\n\n        entry = self.page_tables[table_id][index]\n        entry.present = True\n        entry.frame_address = physical_addr & 0xFFFFFFFFFFFFF000\n        entry.writable = flags.writable\n        entry.user_accessible = flags.user_accessible\n        # Set other flags as needed\n\n    def generate_binary(self, output_path: str) -> None:\n        with open(output_path, 'wb') as f:\n            for table_id in sorted(self.page_tables.keys()):\n                for entry in self.page_tables[table_id]:\n                    f.write(entry.to_bytes())\n\ndef generate_paging_header() -> str:\n    return \"\"\"// Auto-generated paging header\n#ifndef PAGING_CONFIG_H\n#define PAGING_CONFIG_H\n\n#include <stdint.h>\n\n#define PAGE_SIZE 4096\n#define PAGES_PER_TABLE 512\n\ntypedef struct {\n    uint64_t present : 1;\n    uint64_t writable : 1;\n    uint64_t user_accessible : 1;\n    uint64_t write_through : 1;\n    uint64_t cache_disabled : 1;\n    uint64_t accessed : 1;\n    uint64_t dirty : 1;\n    uint64_t pat : 1;\n    uint64_t global_page : 1;\n    uint64_t available : 3;\n    uint64_t frame_address : 40;\n} __attribute__((packed)) PageTableEntry;\n\n#endif // PAGING_CONFIG_H\n\"\"\"\n\nif __name__ == \"__main__\":\n    paging = SingleLevelPaging()\n    # Example usage\n    paging.create_page_table(0)\n    flags = PageTableEntry(writable=True, user_accessible=True)\n    paging.map_page(0, 0x0, 0x1000, flags)\n    paging.generate_binary(\"paging.bin\")\n\n    with open(\"paging_config.h\", \"w\") as f:\n        f.write(generate_paging_header())\n```","refusal":null,"role":"assistant"}}],"created":1773688446,"id":"chatcmpl-b6c7cbef-0833-43a1-b003-169837e3219e","model":"mistral.devstral-2-123b","object":"chat.completion","service_tier":"default","usage":{"completion_tokens":985,"prompt_tokens":900,"total_tokens":1885}}
+--- END RAW RESPONSE ---
+
+
+Generated Code:
+ Based on the repository structure and the task to add single level paging, I'll create a new Python file that integrates with the existing C-based kernel code. Here's the skeleton for a new Python file that would help manage paging configuration:
+
+```python
+# new_folder/paging_config.py
+import struct
+import os
+from typing import List, Dict, Optional
+
+class PageTableEntry:
+    def __init__(self, present: bool = False, writable: bool = False,
+                 user_accessible: bool = False, write_through: bool = False,
+                 cache_disabled: bool = False, accessed: bool = False,
+                 dirty: bool = False, pat: bool = False, global_page: bool = False,
+                 frame_address: int = 0):
+        self.present = present
+        self.writable = writable
+        self.user_accessible = user_accessible
+        self.write_through = write_through
+        self.cache_disabled = cache_disabled
+        self.accessed = accessed
+        self.dirty = dirty
+        self.pat = pat
+        self.global_page = global_page
+        self.frame_address = frame_address
+
+    def to_bytes(self) -> bytes:
+        flags = (self.present << 0) | (self.writable << 1) | \
+                (self.user_accessible << 2) | (self.write_through << 3) | \
+                (self.cache_disabled << 4) | (self.accessed << 5) | \
+                (self.dirty << 6) | (self.pat << 7) | (self.global_page << 8)
+        return struct.pack('<Q', (flags << 12) | (self.frame_address & 0x000FFFFFFFFFF000))
+
+class SingleLevelPaging:
+    def __init__(self, page_size: int = 4096, entries_per_table: int = 512):
+        self.page_size = page_size
+        self.entries_per_table = entries_per_table
+        self.page_tables: Dict[int, List[PageTableEntry]] = {}
+
+    def create_page_table(self, table_id: int) -> None:
+        self.page_tables[table_id] = [PageTableEntry() for _ in range(self.entries_per_table)]
+
+    def map_page(self, table_id: int, virtual_addr: int, physical_addr: int,
+                 flags: PageTableEntry) -> None:
+        if table_id not in self.page_tables:
+            self.create_page_table(table_id)
+
+        index = virtual_addr // self.page_size
+        if index >= self.entries_per_table:
+            raise IndexError("Virtual address out of range")
+
+        entry = self.page_tables[table_id][index]
+        entry.present = True
+        entry.frame_address = physical_addr & 0xFFFFFFFFFFFFF000
+        entry.writable = flags.writable
+        entry.user_accessible = flags.user_accessible
+        # Set other flags as needed
+
+    def generate_binary(self, output_path: str) -> None:
+        with open(output_path, 'wb') as f:
+            for table_id in sorted(self.page_tables.keys()):
+                for entry in self.page_tables[table_id]:
+                    f.write(entry.to_bytes())
+
+def generate_paging_header() -> str:
+    return """// Auto-generated paging header
+#ifndef PAGING_CONFIG_H
+#define PAGING_CONFIG_H
+
+#include <stdint.h>
+
+#define PAGE_SIZE 4096
+#define PAGES_PER_TABLE 512
+
+typedef struct {
+    uint64_t present : 1;
+    uint64_t writable : 1;
+    uint64_t user_accessible : 1;
+    uint64_t write_through : 1;
+    uint64_t cache_disabled : 1;
+    uint64_t accessed : 1;
+    uint64_t dirty : 1;
+    uint64_t pat : 1;
+    uint64_t global_page : 1;
+    uint64_t available : 3;
+    uint64_t frame_address : 40;
+} __attribute__((packed)) PageTableEntry;
+
+#endif // PAGING_CONFIG_H
+"""
+
+if __name__ == "__main__":
+    paging = SingleLevelPaging()
+    # Example usage
+    paging.create_page_table(0)
+    flags = PageTableEntry(writable=True, user_accessible=True)
+    paging.map_page(0, 0x0, 0x1000, flags)
+    paging.generate_binary("paging.bin")
+
+    with open("paging_config.h", "w") as f:
+        f.write(generate_paging_header())
+```
+Save to disk? (y/n): y
+File name (default: new_feature.py): bdh_madeit.py
+Code saved to new_folder\bdh_madeit.py
+
+--- MENU ---
+1. Explore / Understand Repository
+2. Generate Code (single-shot)
+3. Agent Mode (autonomous multi-step)
+4. Memory Stats
+5. Train BDH Model [TRAINED]
+6. Load BDH Components [LOADED]
+7. Exit
+Choose an option (1-7):
