@@ -3,7 +3,7 @@ import sys
 from collections import Counter
 from typing import Optional
 from utils.llm_call import ask_llm
-from utils.executor import execute_plan
+from utils.executor import execute_plan_bundle, parse_code_bundle
 from agent.validator import CodeValidator
 from agent.dashboard import Dashboard
 
@@ -73,17 +73,19 @@ class AgentLoop:
         memory,
         parsed,
         repo_structure,
-        max_retries: int = 3,
+        max_retries: int = 5,
         bdh_router=None,
         working_memory=None,
         repo_language: Optional[str] = None,
+        repo_path: Optional[str] = None,
     ):
         self.retriever = retriever
         self.graph_store = graph_store
         self.memory = memory
         self.parsed = parsed
         self.repo_structure = repo_structure
-        self.validator = CodeValidator()
+        self.repo_path = repo_path or os.getcwd()
+        self.validator = CodeValidator(repo_path=self.repo_path)
         self.max_retries = max_retries
         self.repo_language = repo_language or "python"
 
@@ -198,6 +200,7 @@ file or function to create/modify. Be specific. Example:
     def _generate_code(self, subtask: str, context: dict) -> str:
         """Step 3: Generate code for a single subtask."""
         language = context.get("target_language") or self.repo_language or "python"
+        marker = "# FILE:" if language.lower() == "python" else "// FILE:"
         code_section = ""
         for name, snippet in context.get("retrieved_code", {}).items():
             if isinstance(snippet, dict):
@@ -225,6 +228,11 @@ You are writing {language} code for a repository.
 {context.get('repo_structure', '')}
 
 Write ONLY the {language} code. No explanations, no markdown fences.
+If multiple files are required, output ALL files in one response using markers like:
+{marker} path/to/file
+<code>
+{marker} path/to/other_file
+<code>
 Include proper imports and error handling where appropriate.
 """
         return ask_llm(prompt, max_tokens=4096, temperature=0.3)
@@ -312,6 +320,7 @@ Be concise. One line only.
             print(f"    {C.MAGENTA}{i}.{C.RST} {st}")
 
         results = {"task": task, "subtasks": []}
+        remaining_attempts = self.max_retries
 
         for idx, subtask in enumerate(subtasks, 1):
             print(f"\n{C.HEADER}{'─' * 40}")
@@ -332,30 +341,43 @@ Be concise. One line only.
             success = False
             code = ""
             issues = []
-            for attempt in range(1, self.max_retries + 1):
+            file_map = {}
+            default_name = self._suggest_filename(subtask, language=context.get("target_language"))
+            while remaining_attempts > 0:
+                attempt_no = self.max_retries - remaining_attempts + 1
+                remaining_attempts -= 1
                 # Step 3: Generate
-                print(f"\n  {C.CYAN}[3/7] Generating code (attempt {attempt})...{C.RST}")
+                print(f"\n  {C.CYAN}[3/7] Generating code (attempt {attempt_no}/{self.max_retries})...{C.RST}")
                 raw_code = self._generate_code(subtask, context)
                 code = self._clean_code(raw_code)
 
                 # Step 4: Validate
                 print(f"  {C.CYAN}[4/7] Validating...{C.RST}")
                 language = context.get("target_language") or self.repo_language or "python"
-                valid, issues = self.validator.validate(code, language=language)
+                file_map, _ = parse_code_bundle(
+                    code,
+                    context.get("target_folder", "generated"),
+                    default_name,
+                )
+                valid, issues = self.validator.validate_bundle(file_map, language=language)
+                if valid and issues:
+                    print(f"  {C.YELLOW}Validation warnings: {issues}{C.RST}")
                 if not valid:
                     print(f"  {C.RED}Validation failed: {issues}{C.RST}")
-                    if attempt < self.max_retries:
+                    if remaining_attempts > 0:
                         subtask = f"{subtask}\n\nPrevious attempt had errors: {issues}\nFix them."
-                    continue
+                        continue
+                    break
 
                 # Step 5: Self-critique
                 print(f"  {C.CYAN}[5/7] Self-critiquing...{C.RST}")
                 passed, critique_msg = self._reflect(subtask, code, language=language)
                 if not passed:
                     print(f"  {C.YELLOW}Critique: {critique_msg}{C.RST}")
-                    if attempt < self.max_retries:
+                    if remaining_attempts > 0:
                         subtask = f"{subtask}\n\nSelf-critique feedback: {critique_msg}\nRevise the code."
                         continue
+                    break
 
                 success = True
                 break
@@ -364,9 +386,8 @@ Be concise. One line only.
                 # Step 6: Execute
                 if auto_save:
                     print(f"  {C.CYAN}[6/7] Saving to disk...{C.RST}")
-                    file_name = self._suggest_filename(subtask, language=context.get("target_language"))
-                    path = execute_plan(code, context["target_folder"], file_name)
-                    print(f"  {C.GREEN}Saved: {path}{C.RST}")
+                    paths = execute_plan_bundle(file_map, self.repo_path)
+                    print(f"  {C.GREEN}Saved {len(paths)} file(s).{C.RST}")
                 else:
                     print(f"  {C.CYAN}[6/7] Code ready (auto-save disabled){C.RST}")
                     print(f"  {C.DIM}Preview:\n{code[:500]}...{C.RST}")
@@ -381,13 +402,14 @@ Be concise. One line only.
                     "status": "success",
                 })
             else:
-                print(f"  {C.RED}Failed after {self.max_retries} attempts{C.RST}")
+                print(f"  {C.RED}Not able to generate after {self.max_retries} attempts{C.RST}")
                 results["subtasks"].append({
                     "subtask": subtask,
                     "code": code,
                     "status": "failed",
                     "issues": issues,
                 })
+                break
 
         succeeded = sum(1 for s in results["subtasks"] if s["status"] == "success")
         print(f"\n{C.HEADER}{'=' * 60}")

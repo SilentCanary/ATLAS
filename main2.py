@@ -16,8 +16,9 @@ from context.local_context import build_context_for_nodes
 from context.summarizer import summarize_clusters
 from context.global_summary import generate_global_summary
 from utils.planner import plan_code, explain_repo
-from utils.executor import execute_plan
+from utils.executor import execute_plan_bundle, parse_code_bundle
 from agent.agent_loop import AgentLoop
+from agent.validator import CodeValidator
 
 # ---------------------------------------------------------------------------
 # ANSI Colors
@@ -372,19 +373,46 @@ def explore_repo(parsed, graph_store, retriever, repo_structure, memory, repo_la
     return context
 
 
-def generate_code(context):
+def generate_code(context, repo_path: str):
     query = input(f"{C.CYAN}Enter the new feature or code you want to add: {C.RST}")
     language = context.get("target_language") or context.get("repo_language") or "python"
-    new_code = plan_code(context, query)
+    target = context.get("target_folder", "new_folder")
+    default_name = f"new_feature{default_extension_for_language(language)}"
+
+    validator = CodeValidator(repo_path=repo_path)
+
+    max_attempts = 5
+    issues = []
+    new_code = ""
+    file_map = {}
+
+    for attempt in range(1, max_attempts + 1):
+        attempt_query = query
+        if issues:
+            attempt_query = (
+                f"{query}\n\nPrevious attempt failed validation: {issues}\n"
+                "Fix the issues and regenerate the full bundle."
+            )
+        new_code = plan_code(context, attempt_query)
+        file_map, _ = parse_code_bundle(new_code, target, default_name)
+
+        valid, issues = validator.validate_bundle(file_map, language=language)
+        if valid and issues:
+            print(f"{C.YELLOW}Validation warnings: {issues}{C.RST}")
+        if valid:
+            break
+
+    if issues:
+        print(f"{C.RED}Not able to generate after {max_attempts} attempts{C.RST}")
+        print(f"{C.DIM}Last issues: {issues}{C.RST}")
+        return
+
     print(f"\n{C.HEADER}Generated Code:{C.RST}\n{C.WHITE}{new_code}{C.RST}")
 
     save = input(f"{C.CYAN}Save to disk? (y/n): {C.RST}").strip().lower()
     if save == "y":
-        default_name = f"new_feature{default_extension_for_language(language)}"
-        file_name = input(f"{C.CYAN}File name (default: {default_name}): {C.RST}").strip() or default_name
-        target = context.get("target_folder", "new_folder")
-        path = execute_plan(new_code, target, file_name)
-        print(f"{C.GREEN}Code saved to {path}{C.RST}")
+        paths = execute_plan_bundle(file_map, repo_path)
+        print(f"{C.GREEN}Saved {len(paths)} file(s).{C.RST}")
 
 
 if __name__ == "__main__":
@@ -417,6 +445,7 @@ if __name__ == "__main__":
         memory=memory, parsed=parsed, repo_structure=repo_structure,
         bdh_router=bdh_router, working_memory=working_memory,
         repo_language=repo_language,
+        repo_path=repo_path,
     )
 
     while True:
@@ -437,7 +466,7 @@ if __name__ == "__main__":
             if result:
                 context.update(result)
         elif choice == "2":
-            generate_code(context)
+            generate_code(context, repo_path)
         elif choice == "3":
             task = input(f"{C.CYAN}Describe the feature or task: {C.RST}")
             auto = input(f"{C.CYAN}Auto-save generated files? (y/n): {C.RST}").strip().lower() == "y"

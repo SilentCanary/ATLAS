@@ -76,6 +76,7 @@ Instructions:
 
 def plan_code(context: dict, user_query: str):
     language = context.get("target_language") or context.get("repo_language") or "python"
+    marker = "# FILE:" if language.lower() == "python" else "// FILE:"
     prompt = f"""
 You are adding a new feature to a {language} repository.
 
@@ -102,10 +103,15 @@ You are adding a new feature to a {language} repository.
 {user_query}
 
 Instructions:
-- Write a {language} file skeleton (do NOT overwrite existing files)
+- If multiple files are required, output ALL files in one response
+- Use file markers to separate files, for example:
+    {marker} path/to/file{'.py' if language.lower() == 'python' else ''}
+    <code>
+    {marker} path/to/other_file
+    <code>
 - Include proper imports, class/function definitions
 - Reference the relevant functions/methods from the code above
 - Make the code integrate with existing repo structure
-- Do not write explanations, only code
+- Do not write explanations, only code (no markdown fences)
 """
     return ask_llm(prompt)
